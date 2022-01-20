@@ -54,8 +54,27 @@ V = Geometry.WVector.(ones(FT, fs))
 z₀ = FT(0)
 z₁ = FT(10)
 
-function ∑tendencies!(dT, T, z, t)
+params = (;
+    edmf = TC.EDMFModel(),
+    grid = TC.Grid(mesh),
 
+    edmf = sim.edmf,
+    grid = grid,
+    gm = sim.gm,
+    aux = aux,
+    io_nt = sim.io_nt,
+    case = sim.case,
+    diagnostics = diagnostics,
+    TS = sim.TS,
+    Stats = sim.Stats,
+    skip_io = sim.skip_io,
+    adapt_dt = sim.adapt_dt,
+    cfl_limit = sim.cfl_limit,
+    dt_min = sim.dt_min,
+)
+
+function ∑tendencies!(dT, T, params, t)
+    Unpack.@unpack edmf, grid = params
     ic2f = Operators.InterpolateC2F()
     bc_vb = Operators.SetValue(FT(gaussian(z₀, t; ν = ν, δ = δ, 𝓌 = 𝓌, μ = μ)))
     bc_vt = Operators.SetValue(FT(gaussian(z₁, t; ν = ν, δ = δ, 𝓌 = 𝓌, μ = μ)))
@@ -65,6 +84,7 @@ function ∑tendencies!(dT, T, z, t)
     bc_gt = Operators.SetGradient(
         Geometry.WVector(FT(∇gaussian(z₁, t; ν = ν, δ = δ, 𝓌 = 𝓌, μ = μ))),
     )
+    TC.sgs_tendencies!(edmf, grid)
 
     #   Upwind Biased Product
     #   UB = Operators.UpwindBiasedProductC2F(
@@ -83,12 +103,12 @@ function ∑tendencies!(dT, T, z, t)
     return @. dT = divf2c(ν * gradc2f(T)) - A(V, T)
 end
 
-@show ∑tendencies!(similar(T), T, nothing, 0.0);
+@show ∑tendencies!(similar(T), T, params, 0.0);
 
 # Solve the ODE operator
 Δt = 0.0001
 
-prob = ODEProblem(∑tendencies!, T, (t₀, t₁))
+prob = ODEProblem(∑tendencies!, T, (t₀, t₁), params)
 sol = solve(
     prob,
     SSPRK33(),
