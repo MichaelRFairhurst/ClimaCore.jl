@@ -263,7 +263,7 @@ function rhs!(dY, Y, _, t)
     end
 
     ### DIFFUSION
-    κ₂ = 0.0 # m^2/s
+    κ₂ = 75.0 # m^2/s
     #  1a) horizontal div of horizontal grad of horiz momentun
     @. dρuₕ += hdiv(κ₂ * (ρ * hgrad(ρuₕ / ρ)))
     #  1b) vertical div of vertical grad of horiz momentun

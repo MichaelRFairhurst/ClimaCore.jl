@@ -22,8 +22,8 @@ Logging.global_logger(TerminalLoggers.TerminalLogger())
 function hvspace_2D(
     xlim = (-π, π),
     zlim = (0, 4π),
-    helem = 256,
-    velem = 128,
+    helem = 64,
+    velem = 32,
     npoly = 4,
 )
     FT = Float64
@@ -263,7 +263,7 @@ function rhs!(dY, Y, _, t)
     end
 
     ### DIFFUSION
-    κ₂ = 0.0 # m^2/s
+    κ₂ = 75.0 # m^2/s
     #  1a) horizontal div of horizontal grad of horiz momentun
     @. dρuₕ += hdiv(κ₂ * (ρ * hgrad(ρuₕ / ρ)))
     #  1b) vertical div of vertical grad of horiz momentun
@@ -291,14 +291,14 @@ rhs!(dYdt, Y, nothing, 0.0);
 
 # run!
 using OrdinaryDiffEq
-Δt = 0.1
+Δt = 0.2
 prob = ODEProblem(rhs!, Y, (0.0, 900.0))
 
 integrator = OrdinaryDiffEq.init(
     prob,
     SSPRK33(),
     dt = Δt,
-    saveat = 25.0,
+    saveat = 50.0,
     progress = true,
     progress_message = (dt, u, p, t) -> t,
 );

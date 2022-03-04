@@ -247,7 +247,7 @@ rhs_invariant!(dYdt, Y, nothing, 0.0);
 
 # run!
 using OrdinaryDiffEq
-Δt = 0.15
+Δt = 0.01
 prob = ODEProblem(rhs_invariant!, Y, (0.0, 900.0))
 integrator = OrdinaryDiffEq.init(
     prob,
