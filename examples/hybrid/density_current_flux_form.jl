@@ -76,7 +76,7 @@ end
 # Reference: https://journals.ametsoc.org/view/journals/mwre/140/4/mwr-d-10-05073.1.xml, Section 5a
 function init_density_current_2d(x, z)
     x_c = 0.0
-    z_c = 350.0
+    z_c = 3000.0
     r_c = 1.0
     x_r = 4000.0
     z_r = 2000.0
@@ -320,18 +320,18 @@ mkpath(path)
 # post-processing
 using ClimaCorePlots, Plots
 anim = Plots.@animate for u in sol.u
-    Plots.plot(u.Yc.ρθ ./ u.Yc.ρ)
+    Plots.plot(u.Yc.ρθ ./ u.Yc.ρ, aspect_ratio=:equal)
 end
 Plots.mp4(anim, joinpath(path, "theta.mp4"), fps = 20)
 
 If2c = Operators.InterpolateF2C()
 anim = Plots.@animate for u in sol.u
-    Plots.plot(If2c.(u.ρw) ./ u.Yc.ρ)
+    Plots.plot(If2c.(u.ρw) ./ u.Yc.ρ, aspect_ratio=:equal)
 end
 Plots.mp4(anim, joinpath(path, "vel_w.mp4"), fps = 20)
 
 anim = Plots.@animate for u in sol.u
-    Plots.plot(u.ρuₕ ./ u.Yc.ρ)
+    Plots.plot(u.ρuₕ ./ u.Yc.ρ, aspect_ratio=:equal)
 end
 Plots.mp4(anim, joinpath(path, "vel_u.mp4"), fps = 20)
 

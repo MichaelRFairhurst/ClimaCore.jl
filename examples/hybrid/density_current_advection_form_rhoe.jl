@@ -23,8 +23,8 @@ global_logger(TerminalLogger())
 function hvspace_2D(
     xlim = (-π, π),
     zlim = (0, 4π),
-    xelem = 256,
-    zelem = 128,
+    xelem = 64,
+    zelem = 32,
     npoly = 4,
 )
     FT = Float64
@@ -70,7 +70,7 @@ const T_0 = 273.16 # triple point temperature
 # Prognostic thermodynamic variable: Total Energy 
 function init_dry_rising_bubble_2d(x, z)
     x_c = 0.0
-    z_c = 350.0
+    z_c = 3000.0
     r_c = 1.0
     x_r = 4000.0
     z_r = 2000.0
@@ -230,6 +230,17 @@ function rhs_invariant!(dY, Y, _, t)
         bottom = Operators.Extrapolate(),
         top = Operators.Extrapolate(),
     )
+    
+    vdivc2f = Operators.GradientC2F()
+    
+    @. dw += hwdiv(κ₂ * (hwgrad(fw)))
+    @. dw += vdivc2f(κ₂ * vdivf2c(fw))
+
+    @. duₕ += hwdiv(κ₂ * (hwgrad(cuₕ)))
+    @. duₕ += vdivf2c(κ₂ * vdivc2f(cuₕ))
+
+    @. dρe += hwdiv(κ₂ * (hgrad(h_tot)))
+    @. dρe += vdivf2c(κ₂ * vdivc2f(h_tot))
 
     # Flux correction (Upwind Correction to Central scheme)
     #@. dρ += fcc(fw, cρ)
@@ -247,7 +258,7 @@ rhs_invariant!(dYdt, Y, nothing, 0.0);
 
 # run!
 using OrdinaryDiffEq
-Δt = 0.01
+Δt = 0.2
 prob = ODEProblem(rhs_invariant!, Y, (0.0, 900.0))
 integrator = OrdinaryDiffEq.init(
     prob,
@@ -273,18 +284,18 @@ path = joinpath(@__DIR__, "output", dir)
 mkpath(path)
 
 anim = Plots.@animate for u in sol.u
-    Plots.plot(u.Yc.ρe ./ u.Yc.ρ)
+    Plots.plot(u.Yc.ρe ./ u.Yc.ρ, aspect_ratio=:equal)
 end
 Plots.mp4(anim, joinpath(path, "total_energy.mp4"), fps = 20)
 
 If2c = Operators.InterpolateF2C()
 anim = Plots.@animate for u in sol.u
-  Plots.plot(Geometry.WVector.(Geometry.Covariant13Vector.(If2c.(u.w))))
+  Plots.plot(Geometry.WVector.(Geometry.Covariant13Vector.(If2c.(u.w))), aspect_ratio=:equal)
 end
 Plots.mp4(anim, joinpath(path, "vel_w.mp4"), fps = 20)
 
 anim = Plots.@animate for u in sol.u
-  Plots.plot(Geometry.UVector.(Geometry.Covariant13Vector.(u.uₕ)))
+  Plots.plot(Geometry.UVector.(Geometry.Covariant13Vector.(u.uₕ)), aspect_ratio=:equal)
 end
 Plots.mp4(anim, joinpath(path, "vel_u.mp4"), fps = 20)
 
