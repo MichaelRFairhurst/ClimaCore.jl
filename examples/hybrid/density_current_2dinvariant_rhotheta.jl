@@ -230,7 +230,7 @@ function rhs_invariant!(dY, Y, _, t)
     θ = @. cρθ / cρ
     fρ = @. Ic2f(cρ)
     ∂c = Operators.GradientF2C()
-    ∂f = Operators.GradientF2C()
+    ∂f = Operators.GradientC2F()
     dfws = dY.w.components.data.:1
     dfcs = dY.uₕ.components.data.:1
 
