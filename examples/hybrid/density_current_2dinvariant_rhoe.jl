@@ -225,7 +225,7 @@ function rhs_invariant!(dY, Y, _, t)
     @. dρe -= vdivf2c(fw * Ic2f(cρe + cp))
     @. dρe -= vdivf2c(Ic2f(cuₕ * (cρe + cp)))
     
-    # Vertical Order 2 Diffusion
+    # Uniform 2nd order diffusion
     ∂c = Operators.GradientF2C()
     fρ = @. Ic2f(cρ)
     κ₂ = 75.0 # m^2/s
