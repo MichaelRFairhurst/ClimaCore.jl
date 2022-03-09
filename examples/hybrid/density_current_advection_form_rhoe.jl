@@ -157,7 +157,7 @@ function rhs_invariant!(dY, Y, _, t)
     Spaces.weighted_dss!(dρe)
     Spaces.weighted_dss!(duₕ)
 
-    κ₄ = 100.0 # m^4/s
+    κ₄ = 98311.0 # m^4/s
     κ₂ = 75.0 # m^4/s
     @. dρe = -κ₄ * hwdiv(cρ * hgrad(χe))
     @. duₕ = -κ₄ * (hwgrad(hdiv(χuₕ)))
@@ -170,6 +170,10 @@ function rhs_invariant!(dY, Y, _, t)
 
     # 1.b) vertical divergence
     vdivf2c = Operators.DivergenceF2C(
+        top = Operators.SetValue(Geometry.Contravariant3Vector(0.0)),
+        bottom = Operators.SetValue(Geometry.Contravariant3Vector(0.0)),
+    )
+    vdivc2f = Operators.DivergenceC2F(
         top = Operators.SetValue(Geometry.Contravariant3Vector(0.0)),
         bottom = Operators.SetValue(Geometry.Contravariant3Vector(0.0)),
     )
@@ -221,31 +225,40 @@ function rhs_invariant!(dY, Y, _, t)
     @. dρe -= hdiv(cuw * (cρe + cp))
     @. dρe -= vdivf2c(fw * Ic2f(cρe + cp))
     @. dρe -= vdivf2c(Ic2f(cuₕ * (cρe + cp)))
-
-    fcc = Operators.FluxCorrectionC2C(
-        bottom = Operators.Extrapolate(),
-        top = Operators.Extrapolate(),
-    )
-    fcf = Operators.FluxCorrectionF2F(
-        bottom = Operators.Extrapolate(),
-        top = Operators.Extrapolate(),
-    )
     
-    vdivc2f = Operators.GradientC2F()
+    # Vertical Order 2 Diffusion
+    ∂f = Operators.GradientC2F()
+    ∂c = Operators.GradientF2C()
+    fρ = @. Ic2f(cρ)
+
+    ᶠ∇ᵥh_tot = @. vgradc2f(h_tot)
+    ᶜ∇ᵥw = @. ∂c(fw.components.data.:1)
+    ᶠ∇ᵥuₕ = @. vgradc2f(cuₕ.components.data.:1)
+
+    ᶜ∇ₕh_tot = @. hgrad(h_tot)
+    ᶠ∇ₕw = @. hgrad(fw.components.data.:1)
+    ᶜ∇ₕuₕ = @. hgrad(cuₕ.components.data.:1)
     
-    @. dw += hwdiv(κ₂ * (hwgrad(fw)))
-    @. dw += vdivc2f(κ₂ * vdivf2c(fw))
-
-    @. duₕ += hwdiv(κ₂ * (hwgrad(cuₕ)))
-    @. duₕ += vdivf2c(κ₂ * vdivc2f(cuₕ))
-
-    @. dρe += hwdiv(κ₂ * (hgrad(h_tot)))
-    @. dρe += vdivf2c(κ₂ * vdivc2f(h_tot))
-
-    # Flux correction (Upwind Correction to Central scheme)
-    #@. dρ += fcc(fw, cρ)
-    #@. dρe += fcc(fw, cρe)
-
+    κ₂∇²h_tot = @. vdivf2c(κ₂ * ᶠ∇ᵥh_tot / fρ)
+    κ₂∇²w = @. vdivc2f(κ₂ * ᶜ∇ᵥw / cρ)
+    κ₂∇²uₕ = @. vdivf2c(κ₂ * ᶠ∇ᵥuₕ / fρ)
+    
+    hκ₂∇²w = @. hwdiv(κ₂ * ᶠ∇ₕw / fρ)
+    hκ₂∇²uₕ = @. hwdiv(κ₂ * ᶜ∇ₕuₕ / cρ)
+    hκ₂∇²h_tot = @. hwdiv(κ₂ * ᶜ∇ₕh_tot / cρ)
+    
+    dfws = dY.w.components.data.:1
+    dfcs = dY.uₕ.components.data.:1
+    
+    @. dfws += κ₂∇²w
+    @. dfcs += κ₂∇²uₕ
+    @. dρe += κ₂∇²h_tot
+    @. dfws += hκ₂∇²w
+    @. dfcs += hκ₂∇²uₕ
+    @. dρe += hκ₂∇²h_tot
+    
+    # Horizontal Order 2 Diffusion
+    
     Spaces.weighted_dss!(dY.Yc)
     Spaces.weighted_dss!(dY.uₕ)
     Spaces.weighted_dss!(dY.w)
@@ -258,8 +271,9 @@ rhs_invariant!(dYdt, Y, nothing, 0.0);
 
 # run!
 using OrdinaryDiffEq
+timeend = 900.0
 Δt = 0.2
-prob = ODEProblem(rhs_invariant!, Y, (0.0, 900.0))
+prob = ODEProblem(rhs_invariant!, Y, (0.0, timeend))
 integrator = OrdinaryDiffEq.init(
     prob,
     SSPRK33(),
