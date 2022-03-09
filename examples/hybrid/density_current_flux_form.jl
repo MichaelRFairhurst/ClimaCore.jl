@@ -144,7 +144,7 @@ function total_energy(Y)
     sum(energy.(Yc, ρu, z))
 end
 
-energy_0 = total_energy(Y)
+θ_0 = sum(Yc.ρθ)
 mass_0 = sum(Yc.ρ) # Computes ∫ρ∂Ω such that quadrature weighting is accounted for.
 
 function rhs!(dY, Y, _, t)
@@ -214,17 +214,17 @@ function rhs!(dY, Y, _, t)
 
     ### HYPERVISCOSITY
     # 1) compute hyperviscosity coefficients
-    @. dρθ = hdiv(hgrad(θ))
-    @. dρuₕ = hdiv(hgrad(uₕ))
-    @. dρw = hdiv(hgrad(w))
+    @. dρθ = hwdiv(hgrad(θ))
+    @. dρuₕ = hwdiv(hgrad(uₕ))
+    @. dρw = hwdiv(hgrad(w))
     Spaces.weighted_dss!(dYc)
     Spaces.weighted_dss!(dρuₕ)
     Spaces.weighted_dss!(dρw)
 
-    κ₄ = 100.0 # m^4/s
-    @. dρθ = -κ₄ * hdiv(ρ * hgrad(dρθ))
-    @. dρuₕ = -κ₄ * hdiv(ρ * hgrad(dρuₕ))
-    @. dρw = -κ₄ * hdiv(Yfρ * hgrad(dρw))
+    κ₄ = 98311.0 # m^4/s
+    @. dρθ = -κ₄ * hwdiv(ρ * hgrad(dρθ))
+    @. dρuₕ = -κ₄ * hwdiv(ρ * hgrad(dρuₕ))
+    @. dρw = -κ₄ * hwdiv(Yfρ * hgrad(dρw))
 
     # density
     @. dρ = -∂(ρw)
@@ -254,7 +254,7 @@ function rhs!(dY, Y, _, t)
     @. dρw -= hdiv(uₕf ⊗ ρw)
 
     ### UPWIND FLUX CORRECTION
-    upwind_correction = false 
+    upwind_correction = false
     if upwind_correction
         @. dρ += fcc(w, ρ)
         @. dρθ += fcc(w, ρθ)
@@ -265,17 +265,17 @@ function rhs!(dY, Y, _, t)
     ### DIFFUSION
     κ₂ = 75.0 # m^2/s
     #  1a) horizontal div of horizontal grad of horiz momentun
-    @. dρuₕ += hdiv(κ₂ * (ρ * hgrad(ρuₕ / ρ)))
+    @. dρuₕ += hwdiv(κ₂ * (ρ * hgrad(ρuₕ / ρ)))
     #  1b) vertical div of vertical grad of horiz momentun
     @. dρuₕ += uvdivf2c(κ₂ * (Yfρ * ∂f(ρuₕ / ρ)))
 
     #  1c) horizontal div of horizontal grad of vert momentum
-    @. dρw += hdiv(κ₂ * (Yfρ * hgrad(ρw / Yfρ)))
+    @. dρw += hwdiv(κ₂ * (Yfρ * hgrad(ρw / Yfρ)))
     #  1d) vertical div of vertical grad of vert momentun
     @. dρw += vvdivc2f(κ₂ * (ρ * ∂c(ρw / Yfρ)))
 
     #  2a) horizontal div of horizontal grad of potential temperature
-    @. dρθ += hdiv(κ₂ * (ρ * hgrad(ρθ / ρ)))
+    @. dρθ += hwdiv(κ₂ * (ρ * hgrad(ρθ / ρ)))
     #  2b) vertical div of vertial grad of potential temperature
     @. dρθ += ∂(κ₂ * (Yfρ * ∂f(ρθ / ρ)))
 
@@ -291,7 +291,7 @@ rhs!(dYdt, Y, nothing, 0.0);
 
 # run!
 using OrdinaryDiffEq
-Δt = 0.2
+Δt = 0.3
 prob = ODEProblem(rhs!, Y, (0.0, 900.0))
 
 integrator = OrdinaryDiffEq.init(
@@ -320,26 +320,26 @@ mkpath(path)
 # post-processing
 using ClimaCorePlots, Plots
 anim = Plots.@animate for u in sol.u
-    Plots.plot(u.Yc.ρθ ./ u.Yc.ρ, aspect_ratio=:equal)
+    Plots.plot(u.Yc.ρθ ./ u.Yc.ρ, aspect_ratio=1)
 end
 Plots.mp4(anim, joinpath(path, "theta.mp4"), fps = 20)
 
 If2c = Operators.InterpolateF2C()
 anim = Plots.@animate for u in sol.u
-    Plots.plot(If2c.(u.ρw) ./ u.Yc.ρ, aspect_ratio=:equal)
+    Plots.plot(If2c.(u.ρw) ./ u.Yc.ρ, aspect_ratio=1)
 end
 Plots.mp4(anim, joinpath(path, "vel_w.mp4"), fps = 20)
 
 anim = Plots.@animate for u in sol.u
-    Plots.plot(u.ρuₕ ./ u.Yc.ρ, aspect_ratio=:equal)
+    Plots.plot(u.ρuₕ ./ u.Yc.ρ, aspect_ratio=1)
 end
 Plots.mp4(anim, joinpath(path, "vel_u.mp4"), fps = 20)
 
-Es = [total_energy(u) for u in sol.u]
+θs = [sum(u.Yc.ρθ) for u in sol.u]
 Mass = [sum(u.Yc.ρ) for u in sol.u]
 
 Plots.png(
-    Plots.plot((Es .- energy_0) ./ energy_0),
+    Plots.plot((θs .- θ_0) ./ θ_0),
     joinpath(path, "energy.png"),
 )
 Plots.png(Plots.plot((Mass .- mass_0) ./ mass_0), joinpath(path, "mass.png"))
