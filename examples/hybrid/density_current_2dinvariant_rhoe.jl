@@ -90,7 +90,7 @@ function init_dry_density_current_2d(x, z)
     T = π_exn * θ # temperature
     p = p_0 * π_exn^(cp_d / R_d) # pressure
     ρ = p / R_d / T # density
-    e = cv_d * (T - T_0) + g * z
+    e = cv_d * (T - T_0) + Φ(z)
     ρe = ρ * e # total energy
 
     return (ρ = ρ, ρe = ρe)
