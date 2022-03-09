@@ -88,7 +88,7 @@ function init_density_current_2d(x, z)
     g = grav
 
     # auxiliary quantities
-    r = sqrt((x - x_c)^2/x_r^2 + (z - z_c)^2/z_r^2)
+    r = sqrt((x - x_c)^2 / x_r^2 + (z - z_c)^2 / z_r^2)
     θ_p = r < r_c ? 0.5 * θ_c * (1.0 + cospi(r / r_c)) : 0.0 # potential temperature perturbation
 
     θ = θ_b + θ_p # potential temperature
@@ -221,7 +221,7 @@ function rhs!(dY, Y, _, t)
     Spaces.weighted_dss!(dρuₕ)
     Spaces.weighted_dss!(dρw)
 
-    κ₄ = 98311.0 # m^4/s
+    κ₄ = 0.0 # m^4/s
     @. dρθ = -κ₄ * hwdiv(ρ * hgrad(dρθ))
     @. dρuₕ = -κ₄ * hwdiv(ρ * hgrad(dρuₕ))
     @. dρw = -κ₄ * hwdiv(Yfρ * hgrad(dρw))
@@ -320,26 +320,23 @@ mkpath(path)
 # post-processing
 using ClimaCorePlots, Plots
 anim = Plots.@animate for u in sol.u
-    Plots.plot(u.Yc.ρθ ./ u.Yc.ρ, aspect_ratio=1)
+    Plots.plot(u.Yc.ρθ ./ u.Yc.ρ, aspect_ratio = 1)
 end
 Plots.mp4(anim, joinpath(path, "theta.mp4"), fps = 20)
 
 If2c = Operators.InterpolateF2C()
 anim = Plots.@animate for u in sol.u
-    Plots.plot(If2c.(u.ρw) ./ u.Yc.ρ, aspect_ratio=1)
+    Plots.plot(If2c.(u.ρw) ./ u.Yc.ρ, aspect_ratio = 1)
 end
 Plots.mp4(anim, joinpath(path, "vel_w.mp4"), fps = 20)
 
 anim = Plots.@animate for u in sol.u
-    Plots.plot(u.ρuₕ ./ u.Yc.ρ, aspect_ratio=1)
+    Plots.plot(u.ρuₕ ./ u.Yc.ρ, aspect_ratio = 1)
 end
 Plots.mp4(anim, joinpath(path, "vel_u.mp4"), fps = 20)
 
 θs = [sum(u.Yc.ρθ) for u in sol.u]
 Mass = [sum(u.Yc.ρ) for u in sol.u]
 
-Plots.png(
-    Plots.plot((θs .- θ_0) ./ θ_0),
-    joinpath(path, "energy.png"),
-)
+Plots.png(Plots.plot((θs .- θ_0) ./ θ_0), joinpath(path, "energy.png"))
 Plots.png(Plots.plot((Mass .- mass_0) ./ mass_0), joinpath(path, "mass.png"))

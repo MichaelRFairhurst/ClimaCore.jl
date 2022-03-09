@@ -88,7 +88,7 @@ function init_dry_density_current_2d(x, z)
     g = grav
 
     # auxiliary quantities
-    r = sqrt((x - x_c)^2/x_r^2 + (z - z_c)^2/z_r^2)
+    r = sqrt((x - x_c)^2 / x_r^2 + (z - z_c)^2 / z_r^2)
     θ_p = r < r_c ? 0.5 * θ_c * (1.0 + cospi(r / r_c)) : 0.0 # potential temperature perturbation
 
     θ = θ_b + θ_p # potential temperature
@@ -147,7 +147,7 @@ function rhs_invariant!(dY, Y, _, t)
     Spaces.weighted_dss!(dρθ)
     Spaces.weighted_dss!(duₕ)
 
-    κ₄ = 98311.0 # m^4/s
+    κ₄ = 0.0 # m^4/s
     @. dρθ = -κ₄ * hwdiv(cρ * hgrad(χθ))
     @. duₕ = -κ₄ * hwgrad(hdiv(χuₕ))
 
@@ -243,7 +243,7 @@ function rhs_invariant!(dY, Y, _, t)
     ᶜ∇ₕuₕ = @. hgrad(cuₕ.components.data.:1)
     ᶠ∇ₕw = @. hgrad(fw.components.data.:1)
     ᶜ∇ₕθ = @. hgrad(θ)
-    
+
     # Laplacian Diffusion (Uniform)
     hκ₂∇²uₕ = @. hwdiv(κ₂ * ᶜ∇ₕuₕ)
     vκ₂∇²uₕ = @. vdivf2c(κ₂ * ᶠ∇ᵥuₕ)
@@ -251,7 +251,7 @@ function rhs_invariant!(dY, Y, _, t)
     vκ₂∇²w = @. vdivc2f(κ₂ * ᶜ∇ᵥw)
     hκ₂∇²θ = @. hwdiv(cρ * κ₂ * ᶜ∇ₕθ)
     vκ₂∇²θ = @. vdivf2c(fρ * κ₂ * ᶠ∇ᵥθ)
-    
+
     @. dcu += hκ₂∇²uₕ
     @. dcu += vκ₂∇²uₕ
     @. dfw += hκ₂∇²w
@@ -292,7 +292,7 @@ mkpath(path)
 
 # post-processing
 anim = Plots.@animate for u in sol_invariant.u
-    Plots.plot(u.Yc.ρθ ./ u.Yc.ρ, aspect_ratio=1)
+    Plots.plot(u.Yc.ρθ ./ u.Yc.ρ, aspect_ratio = 1)
 end
 Plots.mp4(anim, joinpath(path, "theta.mp4"), fps = 20)
 
@@ -304,12 +304,18 @@ Plots.mp4(anim, joinpath(path, "rho.mp4"), fps = 20)
 
 If2c = Operators.InterpolateF2C()
 anim = Plots.@animate for u in sol_invariant.u
-    Plots.plot(Geometry.WVector.(Geometry.Covariant13Vector.(If2c.(u.w))), aspect_ratio=1)
+    Plots.plot(
+        Geometry.WVector.(Geometry.Covariant13Vector.(If2c.(u.w))),
+        aspect_ratio = 1,
+    )
 end
 Plots.mp4(anim, joinpath(path, "vel_w.mp4"), fps = 20)
 
 anim = Plots.@animate for u in sol_invariant.u
-    Plots.plot(Geometry.UVector.(Geometry.Covariant13Vector.(u.uₕ)), aspect_ratio=1)
+    Plots.plot(
+        Geometry.UVector.(Geometry.Covariant13Vector.(u.uₕ)),
+        aspect_ratio = 1,
+    )
 end
 Plots.mp4(anim, joinpath(path, "vel_u.mp4"), fps = 20)
 
