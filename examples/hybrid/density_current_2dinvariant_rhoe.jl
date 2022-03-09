@@ -239,9 +239,9 @@ function rhs_invariant!(dY, Y, _, t)
     ᶠ∇ₕw = @. hgrad(fw.components.data.:1)
     ᶜ∇ₕuₕ = @. hgrad(cuₕ.components.data.:1)
     
-    κ₂∇²h_tot = @. vdivf2c(κ₂ * ᶠ∇ᵥh_tot / fρ)
-    κ₂∇²w = @. vdivc2f(κ₂ * ᶜ∇ᵥw / cρ)
-    κ₂∇²uₕ = @. vdivf2c(κ₂ * ᶠ∇ᵥuₕ / fρ)
+    vκ₂∇²h_tot = @. vdivf2c(κ₂ * ᶠ∇ᵥh_tot / fρ)
+    vκ₂∇²w = @. vdivc2f(κ₂ * ᶜ∇ᵥw / cρ)
+    vκ₂∇²uₕ = @. vdivf2c(κ₂ * ᶠ∇ᵥuₕ / fρ)
     
     hκ₂∇²w = @. hwdiv(κ₂ * ᶠ∇ₕw / fρ)
     hκ₂∇²uₕ = @. hwdiv(κ₂ * ᶜ∇ₕuₕ / cρ)
@@ -250,9 +250,9 @@ function rhs_invariant!(dY, Y, _, t)
     dfws = dY.w.components.data.:1
     dfcs = dY.uₕ.components.data.:1
     
-    @. dfws += κ₂∇²w
-    @. dfcs += κ₂∇²uₕ
-    @. dρe += κ₂∇²h_tot
+    @. dfws += vκ₂∇²w
+    @. dfcs += vκ₂∇²uₕ
+    @. dρe += vκ₂∇²h_tot
     @. dfws += hκ₂∇²w
     @. dfcs += hκ₂∇²uₕ
     @. dρe += hκ₂∇²h_tot

@@ -230,28 +230,29 @@ function rhs_invariant!(dY, Y, _, t)
     θ = @. cρθ / cρ
     fρ = @. Ic2f(cρ)
     ∂c = Operators.GradientF2C()
+    ∂f = Operators.GradientF2C()
     dfws = dY.w.components.data.:1
     dfcs = dY.uₕ.components.data.:1
 
     ᶜ∇ᵥw = @. ∂c(fw.components.data.:1)
-    ᶠ∇ᵥuₕ = @. vgradc2f(cuₕ.components.data.:1)
+    ᶠ∇ᵥuₕ = @. ∂f(cuₕ.components.data.:1)
     ᶠ∇ᵥθ = @. vgradc2f(θ)
 
     ᶠ∇ₕw = @. hgrad(fw.components.data.:1)
     ᶜ∇ₕuₕ = @. hgrad(cuₕ.components.data.:1)
     ᶜ∇ₕθ = @. hgrad(θ)
     
-    κ₂∇²w = @. vdivc2f(κ₂ * ᶜ∇ᵥw / cρ)
-    κ₂∇²uₕ = @. vdivf2c(κ₂ * ᶠ∇ᵥuₕ / fρ)
-    κ₂∇²θ = @. vdivf2c(fρ * κ₂ * ᶠ∇ᵥθ)
+    vκ₂∇²w = @. vdivc2f(κ₂ * ᶜ∇ᵥw / cρ)
+    vκ₂∇²uₕ = @. vdivf2c(κ₂ * ᶠ∇ᵥuₕ / fρ)
+    vκ₂∇²θ = @. vdivf2c(fρ * κ₂ * ᶠ∇ᵥθ)
     
     hκ₂∇²w = @. hwdiv(κ₂ * ᶠ∇ₕw / fρ)
     hκ₂∇²uₕ = @. hwdiv(κ₂ * ᶜ∇ₕuₕ / cρ)
     hκ₂∇²θ = @. hwdiv(cρ * κ₂ * ᶜ∇ₕθ)
     
-    @. dfws += κ₂∇²w
-    @. dfcs += κ₂∇²uₕ
-    @. dρθ += κ₂∇²θ
+    @. dfws += vκ₂∇²w
+    @. dfcs += vκ₂∇²uₕ
+    @. dρθ += vκ₂∇²θ
 
     @. dfws += hκ₂∇²w
     @. dfcs += hκ₂∇²uₕ
@@ -269,7 +270,7 @@ rhs_invariant!(dYdt, Y, nothing, 0.0);
 
 # run!
 using OrdinaryDiffEq
-Δt = 0.2
+Δt = 0.3
 prob = ODEProblem(rhs_invariant!, Y, (0.0, 900.0))
 sol_invariant = solve(
     prob,
