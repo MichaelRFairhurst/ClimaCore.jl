@@ -68,7 +68,7 @@ const T_0 = 273.16 # triple point temperature
 
 # Reference: https://journals.ametsoc.org/view/journals/mwre/140/4/mwr-d-10-05073.1.xml, Section 5a
 # Prognostic thermodynamic variable: Total Energy 
-function init_dry_rising_bubble_2d(x, z)
+function init_dry_density_current_2d(x, z)
     x_c = 0.0
     z_c = 3000.0
     r_c = 1.0
@@ -100,7 +100,7 @@ end
 coords = Fields.coordinate_field(hv_center_space)
 face_coords = Fields.coordinate_field(hv_face_space)
 
-Yc = map(coord -> init_dry_rising_bubble_2d(coord.x, coord.z), coords)
+Yc = map(coord -> init_dry_density_current_2d(coord.x, coord.z), coords)
 uₕ = map(_ -> Geometry.Covariant1Vector(0.0), coords)
 w = map(_ -> Geometry.Covariant3Vector(0.0), face_coords)
 Y = Fields.FieldVector(Yc = Yc, uₕ = uₕ, w = w)
