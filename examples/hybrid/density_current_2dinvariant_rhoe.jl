@@ -158,7 +158,6 @@ function rhs_invariant!(dY, Y, _, t)
     Spaces.weighted_dss!(duₕ)
 
     κ₄ = 98311.0 # m^4/s
-    κ₂ = 75.0 # m^4/s
     @. dρe = -κ₄ * hwdiv(cρ * hgrad(χe))
     @. duₕ = -κ₄ * (hwgrad(hdiv(χuₕ)))
 
@@ -229,6 +228,7 @@ function rhs_invariant!(dY, Y, _, t)
     # Vertical Order 2 Diffusion
     ∂c = Operators.GradientF2C()
     fρ = @. Ic2f(cρ)
+    κ₂ = 75.0 # m^2/s
 
     ᶠ∇ᵥuₕ = @. vgradc2f(cuₕ.components.data.:1)
     ᶜ∇ᵥw = @. ∂c(fw.components.data.:1)

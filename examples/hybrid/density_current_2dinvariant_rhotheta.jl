@@ -110,6 +110,9 @@ uₕ = map(_ -> Geometry.Covariant1Vector(0.0), coords)
 w = map(_ -> Geometry.Covariant3Vector(0.0), face_coords)
 Y = Fields.FieldVector(Yc = Yc, uₕ = uₕ, w = w)
 
+theta_0 = sum(Y.Yc.ρθ)
+mass_0 = sum(Y.Yc.ρ)
+
 function rhs_invariant!(dY, Y, _, t)
 
     cρ = Y.Yc.ρ # scalar on centers
@@ -306,6 +309,18 @@ end
 Plots.mp4(anim, joinpath(path, "vel_w.mp4"), fps = 20)
 
 anim = Plots.@animate for u in sol_invariant.u
-    Plots.plot(Geometry.UVector.(Geometry.Covariant13Vector.(u.uₕ)))
+    Plots.plot(Geometry.UVector.(Geometry.Covariant13Vector.(u.uₕ)), aspect_ratio=1)
 end
 Plots.mp4(anim, joinpath(path, "vel_u.mp4"), fps = 20)
+
+θs = [sum(u.Yc.ρθ) for u in sol_invariant.u]
+Mass = [sum(u.Yc.ρ) for u in sol_invariant.u]
+
+Plots.png(
+    Plots.plot((θs .- theta_0) ./ theta_0),
+    joinpath(path, "energy_cons.png"),
+)
+Plots.png(
+    Plots.plot((Mass .- mass_0) ./ mass_0),
+    joinpath(path, "mass_cons.png"),
+)
