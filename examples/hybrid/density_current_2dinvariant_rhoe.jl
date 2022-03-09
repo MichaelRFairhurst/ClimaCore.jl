@@ -227,37 +227,34 @@ function rhs_invariant!(dY, Y, _, t)
     @. dρe -= vdivf2c(Ic2f(cuₕ * (cρe + cp)))
     
     # Vertical Order 2 Diffusion
-    ∂f = Operators.GradientC2F()
     ∂c = Operators.GradientF2C()
     fρ = @. Ic2f(cρ)
 
-    ᶠ∇ᵥh_tot = @. vgradc2f(h_tot)
-    ᶜ∇ᵥw = @. ∂c(fw.components.data.:1)
     ᶠ∇ᵥuₕ = @. vgradc2f(cuₕ.components.data.:1)
+    ᶜ∇ᵥw = @. ∂c(fw.components.data.:1)
+    ᶠ∇ᵥh_tot = @. vgradc2f(h_tot)
 
-    ᶜ∇ₕh_tot = @. hgrad(h_tot)
-    ᶠ∇ₕw = @. hgrad(fw.components.data.:1)
     ᶜ∇ₕuₕ = @. hgrad(cuₕ.components.data.:1)
+    ᶠ∇ₕw = @. hgrad(fw.components.data.:1)
+    ᶜ∇ₕh_tot = @. hgrad(h_tot)
     
-    vκ₂∇²h_tot = @. vdivf2c(κ₂ * ᶠ∇ᵥh_tot / fρ)
-    vκ₂∇²w = @. vdivc2f(κ₂ * ᶜ∇ᵥw / cρ)
-    vκ₂∇²uₕ = @. vdivf2c(κ₂ * ᶠ∇ᵥuₕ / fρ)
+    hκ₂∇²uₕ = @. hwdiv(κ₂ * ᶜ∇ₕuₕ)
+    vκ₂∇²uₕ = @. vdivf2c(κ₂ * ᶠ∇ᵥuₕ)
+    hκ₂∇²w = @. hwdiv(κ₂ * ᶠ∇ₕw)
+    vκ₂∇²w = @. vdivc2f(κ₂ * ᶜ∇ᵥw)
+    hκ₂∇²h_tot = @. hwdiv(cρ * κ₂ * ᶜ∇ₕh_tot)
+    vκ₂∇²h_tot = @. vdivf2c(fρ * κ₂ * ᶠ∇ᵥh_tot)
     
-    hκ₂∇²w = @. hwdiv(κ₂ * ᶠ∇ₕw / fρ)
-    hκ₂∇²uₕ = @. hwdiv(κ₂ * ᶜ∇ₕuₕ / cρ)
-    hκ₂∇²h_tot = @. hwdiv(κ₂ * ᶜ∇ₕh_tot / cρ)
+    dfw = dY.w.components.data.:1
+    dcu = dY.uₕ.components.data.:1
     
-    dfws = dY.w.components.data.:1
-    dfcs = dY.uₕ.components.data.:1
-    
-    @. dfws += vκ₂∇²w
-    @. dfcs += vκ₂∇²uₕ
-    @. dρe += vκ₂∇²h_tot
-    @. dfws += hκ₂∇²w
-    @. dfcs += hκ₂∇²uₕ
+    # Laplacian Diffusion (Uniform)
+    @. dcu += hκ₂∇²uₕ
+    @. dcu += vκ₂∇²uₕ
+    @. dfw += hκ₂∇²w
+    @. dfw += vκ₂∇²w
     @. dρe += hκ₂∇²h_tot
-    
-    # Horizontal Order 2 Diffusion
+    @. dρe += vκ₂∇²h_tot
     
     Spaces.weighted_dss!(dY.Yc)
     Spaces.weighted_dss!(dY.uₕ)
@@ -272,7 +269,7 @@ rhs_invariant!(dYdt, Y, nothing, 0.0);
 # run!
 using OrdinaryDiffEq
 timeend = 900.0
-Δt = 0.2
+Δt = 0.3
 prob = ODEProblem(rhs_invariant!, Y, (0.0, timeend))
 integrator = OrdinaryDiffEq.init(
     prob,

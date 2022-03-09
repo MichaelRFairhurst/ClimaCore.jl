@@ -230,33 +230,31 @@ function rhs_invariant!(dY, Y, _, t)
     θ = @. cρθ / cρ
     fρ = @. Ic2f(cρ)
     ∂c = Operators.GradientF2C()
-    ∂f = Operators.GradientC2F()
-    dfws = dY.w.components.data.:1
-    dfcs = dY.uₕ.components.data.:1
+    dfw = dY.w.components.data.:1
+    dcu = dY.uₕ.components.data.:1
 
+    ᶠ∇ᵥuₕ = @. vgradc2f(cuₕ.components.data.:1)
     ᶜ∇ᵥw = @. ∂c(fw.components.data.:1)
-    ᶠ∇ᵥuₕ = @. ∂f(cuₕ.components.data.:1)
     ᶠ∇ᵥθ = @. vgradc2f(θ)
 
-    ᶠ∇ₕw = @. hgrad(fw.components.data.:1)
     ᶜ∇ₕuₕ = @. hgrad(cuₕ.components.data.:1)
+    ᶠ∇ₕw = @. hgrad(fw.components.data.:1)
     ᶜ∇ₕθ = @. hgrad(θ)
     
-    vκ₂∇²w = @. vdivc2f(κ₂ * ᶜ∇ᵥw / cρ)
-    vκ₂∇²uₕ = @. vdivf2c(κ₂ * ᶠ∇ᵥuₕ / fρ)
+    # Laplacian Diffusion (Uniform)
+    hκ₂∇²uₕ = @. hwdiv(κ₂ * ᶜ∇ₕuₕ)
+    vκ₂∇²uₕ = @. vdivf2c(κ₂ * ᶠ∇ᵥuₕ)
+    hκ₂∇²w = @. hwdiv(κ₂ * ᶠ∇ₕw)
+    vκ₂∇²w = @. vdivc2f(κ₂ * ᶜ∇ᵥw)
+    hκ₂∇²θ = @. hwdiv(cρ * κ₂ * ᶜ∇ₕθ)
     vκ₂∇²θ = @. vdivf2c(fρ * κ₂ * ᶠ∇ᵥθ)
     
-    hκ₂∇²w = @. hwdiv(κ₂ * ᶠ∇ₕw / fρ)
-    hκ₂∇²uₕ = @. hwdiv(κ₂ * ᶜ∇ₕuₕ / cρ)
-    hκ₂∇²θ = @. hwdiv(cρ * κ₂ * ᶜ∇ₕθ)
-    
-    @. dfws += vκ₂∇²w
-    @. dfcs += vκ₂∇²uₕ
-    @. dρθ += vκ₂∇²θ
-
-    @. dfws += hκ₂∇²w
-    @. dfcs += hκ₂∇²uₕ
+    @. dcu += hκ₂∇²uₕ
+    @. dcu += vκ₂∇²uₕ
+    @. dfw += hκ₂∇²w
+    @. dfw += vκ₂∇²w
     @. dρθ += hκ₂∇²θ
+    @. dρθ += vκ₂∇²θ
 
     Spaces.weighted_dss!(dY.Yc)
     Spaces.weighted_dss!(dY.uₕ)
