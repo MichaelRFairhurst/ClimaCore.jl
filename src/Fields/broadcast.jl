@@ -107,9 +107,7 @@ end
     space1::Type{S},
     space2::Type{S},
 ) where {S <: AbstractSpace}
-    error(
-        "Broacasted spaces are the same ClimaCore.Spaces type but not the same instance",
-    )
+    @warn "Broacasted spaces are the same ClimaCore.Spaces type but not the same instance"
 end
 
 @noinline function error_mismatched_spaces(space1::Type, space2::Type)
