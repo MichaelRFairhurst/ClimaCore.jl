@@ -103,7 +103,7 @@ function Base.copyto!(
     return dest
 end
 
-@nospecialized function error_mismatched_spaces(
+@nospecialize function error_mismatched_spaces(
     space1::Type{S},
     space2::Type{S},
 ) where {S <: AbstractSpace}
@@ -111,7 +111,7 @@ end
     return nothing
 end
 
-@nospecialized function error_mismatched_spaces(space1::Type, space2::Type)
+@nospecialize function error_mismatched_spaces(space1::Type, space2::Type)
     error("Broacasted spaces are not the same ClimaCore.Spaces type")
 end
 
