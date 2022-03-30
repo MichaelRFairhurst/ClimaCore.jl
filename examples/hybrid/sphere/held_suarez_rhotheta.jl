@@ -47,7 +47,7 @@ hv_center_space =
 hv_face_space = Spaces.FaceExtrudedFiniteDifferenceSpace(hv_center_space)
 
 t_end = FT(60 * 60 * 24 * 1200)
-dt = FT(100)
+dt = FT(400)
 dt_save_to_sol = FT(60 * 60 * 24)
 dt_save_to_disk = FT(60 * 60 * 24 * 10) # 0 means don't save to disk
 ode_algorithm = OrdinaryDiffEq.Rosenbrock23
