@@ -57,7 +57,7 @@ jacobian_flags = (; ∂ᶜ𝔼ₜ∂ᶠ𝕄_mode = :exact, ∂ᶠ𝕄ₜ∂ᶜρ
 additional_cache(ᶜlocal_geometry, ᶠlocal_geometry, dt) = merge(
     hyperdiffusion_cache(ᶜlocal_geometry, ᶠlocal_geometry; κ₄ = FT(2e17)),
     sponge ? rayleigh_sponge_cache(ᶜlocal_geometry, ᶠlocal_geometry, dt) : (;),
-    viscous_sponge ? viscous_sponge_cache(ᶜlocal_geometry, ᶠlocal_geometry; z_s = FT(26.0e3), κ₂=FT(1e5)) : (;),
+    viscous_sponge ? viscous_sponge_cache(ᶜlocal_geometry, ᶠlocal_geometry; z_s = FT(26.0e3), κ₂=FT(1e6)) : (;),
     held_suarez_cache(ᶜlocal_geometry),
 )
 function additional_tendency!(Yₜ, Y, p, t, comms_ctx = nothing)

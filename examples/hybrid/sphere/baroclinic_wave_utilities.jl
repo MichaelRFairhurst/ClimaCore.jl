@@ -144,11 +144,11 @@ function viscous_sponge_tendency!(Yₜ, Y, p, t)
     ᶜρ = Y.c.ρ
     ᶜuₕ = Y.c.uₕ
     if :ρθ in propertynames(Y.c)
-        @. Yₜ.c.ρθ += ᶜα * wdivₕ(gradₕ(Y.c.ρθ / ᶜρ))
+        @. Yₜ.c.ρθ += ᶜα * wdivₕ(ᶜρ * gradₕ(Y.c.ρθ / ᶜρ))
     elseif :ρe in propertynames(Y.c)
-	@. Yₜ.c.ρe += ᶜα * wdivₕ(gradₕ((Y.c.ρe + ᶜp) / ᶜρ))
+	@. Yₜ.c.ρe += ᶜα * wdivₕ(ᶜρ * gradₕ((Y.c.ρe + ᶜp) / ᶜρ))
     elseif :ρe_int in propertynames(Y.c)
-	@. Yₜ.c.ρe_int += ᶜα * wdivₕ(gradₕ((Y.c.ρe_int + ᶜp) / ᶜρ))
+	@. Yₜ.c.ρe_int += ᶜα * wdivₕ(ᶜρ * gradₕ((Y.c.ρe_int + ᶜp) / ᶜρ))
     end
     @. Yₜ.c.uₕ += ᶜα * (wgradₕ(divₕ(ᶜuₕ)) - Geometry.Covariant12Vector(
         wcurlₕ(Geometry.Covariant3Vector(curlₕ(ᶜuₕ))),
