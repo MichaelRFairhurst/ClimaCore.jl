@@ -131,6 +131,31 @@ function rayleigh_sponge_tendency!(Yₜ, Y, p, t)
     @. Yₜ.f.w -= ᶠβ * Y.f.w
 end
 
+function viscous_sponge_cache(ᶜlocal_geometry, ᶠlocal_geometry; z_s=FT(26e3), κ₂=(1e5))
+    ᶜz = ᶜlocal_geometry.coordinates.z
+    ᶠz = ᶠlocal_geometry.coordinates.z
+    ᶜα = @. ifelse(ᶜz > z_s, κ₂, FT(0))
+    ᶠα = @. ifelse(ᶠz > z_s, κ₂, FT(0))
+    return (; ᶜα, ᶠα)
+end
+
+function viscous_sponge_tendency!(Yₜ, Y, p, t)
+    (; ᶜα, ᶠα, ᶜp) = p
+    ᶜρ = Y.c.ρ
+    ᶜuₕ = Y.c.uₕ
+    if :ρθ in propertynames(Y.c)
+        @. Yₜ.c.ρθ += ᶜα * wdivₕ(gradₕ(Y.c.ρθ / ᶜρ))
+    elseif :ρe in propertynames(Y.c)
+	@. Yₜ.c.ρe += ᶜα * wdivₕ(gradₕ((Y.c.ρe + ᶜp) / ᶜρ))
+    elseif :ρe_int in propertynames(Y.c)
+	@. Yₜ.c.ρe_int += ᶜα * wdivₕ(gradₕ((Y.c.ρe_int + ᶜp) / ᶜρ))
+    end
+    @. Yₜ.c.uₕ += ᶜα * (wgradₕ(divₕ(ᶜuₕ)) - Geometry.Covariant12Vector(
+        wcurlₕ(Geometry.Covariant3Vector(curlₕ(ᶜuₕ))),
+    ))
+    @. Yₜ.f.w.components.data.:1 += ᶠα * wdivₕ(gradₕ(Y.f.w.components.data.:1))
+end
+
 held_suarez_cache(ᶜlocal_geometry) = (;
     ᶜσ = similar(ᶜlocal_geometry, FT),
     ᶜheight_factor = similar(ᶜlocal_geometry, FT),

@@ -4,6 +4,7 @@ using ClimaCore.DataLayouts
 include("baroclinic_wave_utilities.jl")
 
 const sponge = false
+const viscous_sponge = true
 
 # Variables required for driver.jl (modify as needed)
 helems, zelems, npoly = 4, 10, 4
@@ -46,21 +47,23 @@ hv_center_space =
     Spaces.ExtrudedFiniteDifferenceSpace(horzspace, vert_center_space)
 hv_face_space = Spaces.FaceExtrudedFiniteDifferenceSpace(hv_center_space)
 
-t_end = FT(60 * 60 * 24 * 10)
+t_end = FT(60 * 60 * 24 * 1200)
 dt = FT(400)
 dt_save_to_sol = FT(60 * 60 * 24)
-dt_save_to_disk = FT(0) # 0 means don't save to disk
+dt_save_to_disk = FT(60 * 60 * 24 * 10) # 0 means don't save to disk
 ode_algorithm = OrdinaryDiffEq.Rosenbrock23
 jacobian_flags = (; ∂ᶜ𝔼ₜ∂ᶠ𝕄_mode = :exact, ∂ᶠ𝕄ₜ∂ᶜρ_mode = :exact)
 
 additional_cache(ᶜlocal_geometry, ᶠlocal_geometry, dt) = merge(
     hyperdiffusion_cache(ᶜlocal_geometry, ᶠlocal_geometry; κ₄ = FT(2e17)),
     sponge ? rayleigh_sponge_cache(ᶜlocal_geometry, ᶠlocal_geometry, dt) : (;),
+    viscous_sponge ? viscous_sponge_cache(ᶜlocal_geometry, ᶠlocal_geometry; z_s = FT(26.0e3), κ₂=FT(1e5)) : (;),
     held_suarez_cache(ᶜlocal_geometry),
 )
 function additional_tendency!(Yₜ, Y, p, t, comms_ctx = nothing)
     hyperdiffusion_tendency!(Yₜ, Y, p, t, comms_ctx)
     sponge && rayleigh_sponge_tendency!(Yₜ, Y, p, t)
+    viscous_sponge && viscous_sponge_tendency!(Yₜ, Y, p, t)
     held_suarez_tendency!(Yₜ, Y, p, t)
 end
 
