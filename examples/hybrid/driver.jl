@@ -23,6 +23,7 @@ end
 
 import ClimaCore: enable_threading
 enable_threading() = true
+using ClimaCore: Operators
 
 using OrdinaryDiffEq
 using DiffEqCallbacks
@@ -73,8 +74,8 @@ else
         Fields.local_geometry_field(hv_face_space)
 
     Y = Fields.FieldVector(
-        c = map(center_initial_condition, ᶜlocal_geometry),
-        f = map(face_initial_condition, ᶠlocal_geometry),
+        c = Spaces.weighted_dss!(map(center_initial_condition, ᶜlocal_geometry)),
+	f = Spaces.weighted_dss!(map(face_initial_condition, ᶠlocal_geometry)),
     )
 end
 p = get_cache(ᶜlocal_geometry, ᶠlocal_geometry, dt)
