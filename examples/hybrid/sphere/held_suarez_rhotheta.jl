@@ -12,7 +12,7 @@ z_max = FT(30e3)
 z_elem = 10
 t_end = FT(60 * 60 * 24 * 1200)
 dt = FT(400)
-dt_save_to_sol = FT(60 * 60 * 24)
+dt_save_to_sol = FT(60 * 60 * 24 * 10)
 dt_save_to_disk = FT(60 * 60 * 24 * 10) # 0 means don't save to disk
 ode_algorithm = OrdinaryDiffEq.Rosenbrock23
 jacobian_flags = (; ∂ᶜ𝔼ₜ∂ᶠ𝕄_mode = :exact, ∂ᶠ𝕄ₜ∂ᶜρ_mode = :exact)
