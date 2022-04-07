@@ -224,6 +224,9 @@ end
             center_values = ones(FT, center_space)
             center_velocities = Geometry.WVector.(center_values)
 
+            function_filter(@nospecialize(ft)) =
+                ft !== typeof(Base.CoreLogging.handle_message)
+
             # face space operators
             @test_opt sum(ones(FT, face_space))
             @test_opt sum(sin.(faces))
@@ -241,8 +244,8 @@ end
                 faces,
             )
 
-            @test_opt opt_GradientF2C(faces)
-            @test_opt opt_DivergenceF2C(faces)
+            @test_opt function_filter = function_filter opt_GradientF2C(faces)
+            @test_opt function_filter = function_filter opt_DivergenceF2C(faces)
 
             @test_opt opt_SetBoundary_SetValue(faces)
 
@@ -287,12 +290,22 @@ end
                 centers,
             )
 
-            @test_opt opt_GradientC2F_SetValue(centers)
-            @test_opt opt_GradientC2F_SetGradient(centers)
+            @test_opt function_filter = function_filter opt_GradientC2F_SetValue(
+                centers,
+            )
+            @test_opt function_filter = function_filter opt_GradientC2F_SetGradient(
+                centers,
+            )
 
-            @test_opt opt_DivergenceC2F_SetValue(centers)
-            @test_opt opt_DivergenceC2F_SetDivergence(centers)
-            @test_opt opt_CurlC2F_SetValue(centers)
+            @test_opt function_filter = function_filter opt_DivergenceC2F_SetValue(
+                centers,
+            )
+            @test_opt function_filter = function_filter opt_DivergenceC2F_SetDivergence(
+                centers,
+            )
+            @test_opt function_filter = function_filter opt_CurlC2F_SetValue(
+                centers,
+            )
         end
     end
 end

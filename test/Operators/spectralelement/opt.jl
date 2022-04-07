@@ -2,7 +2,6 @@ using Test
 using JET
 using LinearAlgebra, IntervalSets
 
-using ClimaCore
 import ClimaCore:
     Geometry, Fields, Domains, Topologies, Meshes, Spaces, Operators
 
@@ -101,6 +100,8 @@ end
 @static if @isdefined(var"@test_opt")
 
     function test_operators(field, vfield)
+        function_filter(@nospecialize(ft)) =
+            ft !== typeof(Base.CoreLogging.handle_message)
         @test_opt opt_Gradient(field)
         opt_WeakGradient(field)
 
@@ -116,9 +117,6 @@ end
         @test_opt opt_VectorDss_DivGrad(vfield)
 
         @test_opt opt_ScalarHyperdiffusion(field)
-        function_filter(@nospecialize(ft)) =
-            ft !== typeof(Base.CoreLogging.handle_message)
-        # function_filter(@nospecialize(ft)) = false
         @test_opt function_filter = function_filter opt_VectorHyperdiffusion(
             vfield,
         )
