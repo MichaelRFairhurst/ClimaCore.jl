@@ -22,7 +22,6 @@ face_initial_condition(local_geometry) = (;)
 postprocessing(sol, output_dir) = nothing
 
 ################################################################################
-
 is_distributed = haskey(ENV, "CLIMACORE_DISTRIBUTED")
 
 using Logging
@@ -30,12 +29,12 @@ if is_distributed
     using ClimaComms
     if ENV["CLIMACORE_DISTRIBUTED"] == "MPI"
         using ClimaCommsMPI
-        const Context = ClimaCommsMPI.MPICommsContext
+        const comms_ctx = ClimaCommsMPI.MPICommsContext()
     else
         error("ENV[\"CLIMACORE_DISTRIBUTED\"] only supports the \"MPI\" option")
     end
-    const pid, nprocs = ClimaComms.init(Context)
-    logger_stream = ClimaComms.iamroot(Context) ? stderr : devnull
+    const pid, nprocs = ClimaComms.init(comms_ctx)
+    logger_stream = ClimaComms.iamroot(comms_ctx) ? stderr : devnull
     prev_logger = global_logger(ConsoleLogger(logger_stream, Logging.Info))
     @info "Setting up distributed run on $nprocs \
         processor$(nprocs == 1 ? "" : "s")"
@@ -47,14 +46,11 @@ atexit() do
     global_logger(prev_logger)
 end
 
-import ClimaCore: enable_threading
-enable_threading() = true
-
 using OrdinaryDiffEq
 using DiffEqCallbacks
 using JLD2
 
-const FT = get(ENV, "FLOAT_TYPE", "Float64") == "Float32" ? Float32 : Float64
+const FT = get(ENV, "FLOAT_TYPE", "Float32") == "Float32" ? Float32 : Float64
 
 include("../implicit_solver_debugging_tools.jl")
 include("../ordinary_diff_eq_bug_fixes.jl")
@@ -66,6 +62,9 @@ else
     error("ENV[\"TEST_NAME\"] required (e.g., \"sphere/baroclinic_wave_rhoe\")")
 end
 include(joinpath(test_dir, "$test_file_name.jl"))
+
+import ClimaCore: enable_threading
+enable_threading() = false
 
 # TODO: When is_distributed is true, automatically compute the maximum number of
 # bytes required to store an element from Y.c or Y.f (or, really, from any Field
@@ -88,27 +87,11 @@ if haskey(ENV, "RESTART_FILE")
     close(restart_data)
     ᶜlocal_geometry = Fields.local_geometry_field(Y.c)
     ᶠlocal_geometry = Fields.local_geometry_field(Y.f)
-    if is_distributed
-        comms_ctx = Spaces.setup_comms(
-            Context,
-            axes(Y.c).horizontal_space.topology,
-            Spaces.Quadratures.GLL{npoly + 1}(),
-            z_elem + 1,
-            max_field_element_size,
-        )
-    else
-        comms_ctx = nothing
-    end
 else
     t_start = FT(0)
     if is_distributed
-        h_space, comms_ctx = make_distributed_horizontal_space(
-            horizontal_mesh,
-            npoly,
-            Context,
-            z_elem + 1,
-            max_field_element_size,
-        )
+        h_space, comms_ctx =
+            make_distributed_horizontal_space(horizontal_mesh, npoly, comms_ctx)
     else
         h_space = make_horizontal_space(horizontal_mesh, npoly)
         comms_ctx = nothing
@@ -120,11 +103,8 @@ else
         c = center_initial_condition.(ᶜlocal_geometry),
         f = face_initial_condition.(ᶠlocal_geometry),
     )
-    # apply dss in case the initial conditions are discontinuous across elements
-    Spaces.weighted_dss!(Y.c, comms_ctx)
-    Spaces.weighted_dss!(Y.f, comms_ctx)
 end
-p = get_cache(ᶜlocal_geometry, ᶠlocal_geometry, comms_ctx, dt)
+p = get_cache(ᶜlocal_geometry, ᶠlocal_geometry, Y, dt)
 
 if ode_algorithm <: Union{
     OrdinaryDiffEq.OrdinaryDiffEqImplicitAlgorithm,
@@ -151,12 +131,13 @@ end
 if haskey(ENV, "OUTPUT_DIR")
     output_dir = ENV["OUTPUT_DIR"]
 else
-    output_dir = joinpath(@__DIR__, test_dir, "output", test_file_name)
+    output_dir =
+        joinpath(@__DIR__, test_dir, "output", test_file_name, string(FT))
 end
 mkpath(output_dir)
 
-function make_save_to_disk(output_dir, test_file_name, is_distributed)
-    function save_to_disk(integrator)
+function make_save_to_disk_func(output_dir, test_file_name, is_distributed)
+    function save_to_disk_func(integrator)
         day = floor(Int, integrator.t / (60 * 60 * 24))
         @info "Saving prognostic variables to JLD2 file on day $day"
         suffix = is_distributed ? "_pid$pid.jld2" : ".jld2"
@@ -164,18 +145,28 @@ function make_save_to_disk(output_dir, test_file_name, is_distributed)
         jldsave(output_file; t = integrator.t, Y = integrator.u)
         return nothing
     end
-    return save_to_disk
+    return save_to_disk_func
+end
+
+save_to_disk_func =
+    make_save_to_disk_func(output_dir, test_file_name, is_distributed)
+
+dss_callback = FunctionCallingCallback(func_start = true) do Y, t, integrator
+    p = integrator.p
+    Spaces.weighted_dss!(Y.c, p.ghost_buffer.c)
+    Spaces.weighted_dss!(Y.f, p.ghost_buffer.f)
 end
 if dt_save_to_disk == 0
-    saving_callback = nothing
+    save_to_disk_callback = nothing
 else
-    saving_callback = PeriodicCallback(
-        make_save_to_disk(output_dir, test_file_name, is_distributed),
+    save_to_disk_callback = PeriodicCallback(
+        save_to_disk_func,
         dt_save_to_disk;
         initial_affect = true,
     )
 end
-callback = CallbackSet(saving_callback, additional_callbacks...)
+callback =
+    CallbackSet(dss_callback, save_to_disk_callback, additional_callbacks...)
 
 problem = SplitODEProblem(
     ODEFunction(
@@ -208,7 +199,7 @@ end
 sol = @timev OrdinaryDiffEq.solve!(integrator)
 
 if is_distributed # replace sol.u on the root processor with the global sol.u
-    if ClimaComms.iamroot(Context)
+    if ClimaComms.iamroot(comms_ctx)
         global_h_space = make_horizontal_space(horizontal_mesh, npoly)
         global_center_space, global_face_space =
             make_hybrid_spaces(global_h_space, z_max, z_elem)
@@ -231,18 +222,18 @@ if is_distributed # replace sol.u on the root processor with the global sol.u
             DataLayouts.gather(comms_ctx, Fields.field_values(sol.u[i].c))
         global_Y_f =
             DataLayouts.gather(comms_ctx, Fields.field_values(sol.u[i].f))
-        if ClimaComms.iamroot(Context)
+        if ClimaComms.iamroot(comms_ctx)
             global_sol_u[i] = Fields.FieldVector(
                 c = Fields.Field(global_Y_c, global_center_space),
                 f = Fields.Field(global_Y_f, global_face_space),
             )
         end
     end
-    if ClimaComms.iamroot(Context)
+    if ClimaComms.iamroot(comms_ctx)
         sol = DiffEqBase.sensitivity_solution(sol, global_sol_u, sol.t)
     end
 end
-if !is_distributed || (is_distributed && ClimaComms.iamroot(Context))
+if !is_distributed || (is_distributed && ClimaComms.iamroot(comms_ctx))
     ENV["GKSwstype"] = "nul" # avoid displaying plots
     postprocessing(sol, output_dir)
 end
