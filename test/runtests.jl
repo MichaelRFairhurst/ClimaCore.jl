@@ -1,5 +1,14 @@
 using Base: operator_associativity
 
+# To extend the JET function filter, see example:
+# https://github.com/aviatesk/JET.jl/blob/f6c9cd765202b60d7950abb48c2abfc54068e574/test/runtests.jl#L88
+function clima_function_filter(@nospecialize ft)
+    ft !== typeof(Base.CoreLogging.handle_message)
+end
+
+macro test_climaopt(ex0...)
+    return var"@test_opt"(__source__, __module__, :(function_filter=$clima_function_filter), ex0...)
+end
 
 # Order of tests is intended to reflect dependency order of functionality
 
