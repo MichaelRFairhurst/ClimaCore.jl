@@ -103,12 +103,12 @@ function Base.copyto!(
     return dest
 end
 
-@noinline function error_mismatched_spaces(
+@noinline function warn_mismatched_spaces(
     space1::Type{S},
     space2::Type{S},
 ) where {S <: AbstractSpace}
     @warn "Broacasted spaces are the same ClimaCore.Spaces type but not the same instance"
-    return nothing
+    return false
 end
 
 @noinline function error_mismatched_spaces(space1::Type, space2::Type)
@@ -119,7 +119,8 @@ end
     space1::AbstractSpace,
     space2::AbstractSpace,
 )
-    if space1 !== space2
+    if space1 !== space2 &&
+       !warn_mismatched_spaces(typeof(space1), typeof(space2))
         error_mismatched_spaces(typeof(space1), typeof(space2))
     end
     return space1
@@ -132,7 +133,8 @@ end
     space1::AbstractSpace,
     space2::AbstractSpace,
 )
-    if space1 !== space2
+    if space1 !== space2 &&
+       !warn_mismatched_spaces(typeof(space1), typeof(space2))
         error_mismatched_spaces(typeof(space1), typeof(space2))
     end
     return nothing
