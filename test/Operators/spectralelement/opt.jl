@@ -97,34 +97,30 @@ function opt_VectorHyperdiffusion(field)
     return ∇⁴
 end
 
-@static if @isdefined(var"@test_opt")
+@static if @isdefined(var"@test_climaopt")
 
     function test_operators(field, vfield)
-        function_filter(@nospecialize(ft)) =
-            ft !== typeof(Base.CoreLogging.handle_message)
-        @test_opt opt_Gradient(field)
+        @test_climaopt opt_Gradient(field)
         opt_WeakGradient(field)
 
-        @test_opt opt_Curl(vfield)
-        @test_opt opt_WeakCurl(vfield)
-        @test_opt opt_CurlCurl(vfield)
+        @test_climaopt opt_Curl(vfield)
+        @test_climaopt opt_WeakCurl(vfield)
+        @test_climaopt opt_CurlCurl(vfield)
 
-        @test_opt opt_Divergence(vfield)
-        @test_opt opt_WeakDivergence(vfield)
+        @test_climaopt opt_Divergence(vfield)
+        @test_climaopt opt_WeakDivergence(vfield)
 
-        @test_opt opt_ScalarDSS(field)
-        @test_opt opt_VectorDss_Curl(vfield)
-        @test_opt opt_VectorDss_DivGrad(vfield)
+        @test_climaopt opt_ScalarDSS(field)
+        @test_climaopt opt_VectorDss_Curl(vfield)
+        @test_climaopt opt_VectorDss_DivGrad(vfield)
 
-        @test_opt opt_ScalarHyperdiffusion(field)
-        @test_opt function_filter = function_filter opt_VectorHyperdiffusion(
-            vfield,
-        )
+        @test_climaopt opt_ScalarHyperdiffusion(field)
+        @test_climaopt opt_VectorHyperdiffusion(vfield)
     end
 end
 
 # Test that Julia ia able to optimize spectral element operations v1.7+
-@static if @isdefined(var"@test_opt")
+@static if @isdefined(var"@test_climaopt")
 
     @testset "Spectral Element 2D Field optimizations" begin
         for FT in (Float64, Float32)
@@ -157,11 +153,11 @@ end
                 Spaces.SpectralElementSpace2D(Spaces.topology(space), Iquad)
 
             I = Operators.Interpolate(Ispace)
-            @test_opt opt_Interpolate(I, field)
+            @test_climaopt opt_Interpolate(I, field)
 
             Ifield = opt_Interpolate(I, field)
             R = Operators.Restrict(space)
-            @test_opt opt_Restrict(R, Ifield)
+            @test_climaopt opt_Restrict(R, Ifield)
 
             test_operators(field, vfield)
         end

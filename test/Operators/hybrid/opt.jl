@@ -228,7 +228,7 @@ function hspace2d(FT)
 end
 
 
-@static if @isdefined(var"@test_opt")
+@static if @isdefined(var"@test_climaopt")
     @testset "Scalar Field ExtrudedFiniteDifferenceSpace" begin
         for FT in (Float64,), hspace in (hspace1d(FT), hspace2d(FT))
             vdomain = Domains.IntervalDomain(
@@ -251,75 +251,78 @@ end
             center_velocities = Geometry.WVector.(center_values)
 
             # face space operators
-            @test_opt sum(ones(FT, face_space))
-            @test_opt sum(sin.(faces))
+            @test_climaopt sum(ones(FT, face_space))
+            @test_climaopt sum(sin.(faces))
 
-            @test_opt opt_InterpolateF2C(faces)
-            @test_opt opt_WeightedInterpolateF2C(face_values, faces)
+            @test_climaopt opt_InterpolateF2C(faces)
+            @test_climaopt opt_WeightedInterpolateF2C(face_values, faces)
 
-            @test_opt opt_LeftBiasedF2C(faces)
-            @test_opt opt_RightBiasedF2C(faces)
+            @test_climaopt opt_LeftBiasedF2C(faces)
+            @test_climaopt opt_RightBiasedF2C(faces)
 
-            @test_opt opt_AdvectionF2F(face_velocities, faces)
+            @test_climaopt opt_AdvectionF2F(face_velocities, faces)
 
-            @test_opt opt_FluxCorrectionF2F_Extrapolate(
+            @test_climaopt opt_FluxCorrectionF2F_Extrapolate(
                 center_velocities,
                 faces,
             )
 
-            @test_opt opt_GradientF2C(faces)
-            @test_opt opt_GradientF2C(faces)
-            @test_opt opt_DivergenceF2C(faces)
+            @test_climaopt opt_GradientF2C(faces)
+            @test_climaopt opt_GradientF2C(faces)
+            @test_climaopt opt_DivergenceF2C(faces)
 
-            @test_opt opt_SetBoundary_SetValue(faces)
+            @test_climaopt opt_SetBoundary_SetValue(faces)
 
             # center space operators
-            @test_opt sum(ones(FT, center_space))
-            @test_opt sum(sin.(centers))
+            @test_climaopt sum(ones(FT, center_space))
+            @test_climaopt sum(sin.(centers))
 
-            @test_opt opt_InterpolateC2F_SetValue(centers)
-            @test_opt opt_InterpolateC2F_SetGradient(centers)
-            @test_opt opt_InterpolateC2F_Extrapolate(centers)
+            @test_climaopt opt_InterpolateC2F_SetValue(centers)
+            @test_climaopt opt_InterpolateC2F_SetGradient(centers)
+            @test_climaopt opt_InterpolateC2F_Extrapolate(centers)
 
-            @test_opt opt_WeightedInterpolateC2F_SetValue(
+            @test_climaopt opt_WeightedInterpolateC2F_SetValue(
                 center_values,
                 centers,
             )
-            @test_opt opt_WeightedInterpolateC2F_SetGradient(
+            @test_climaopt opt_WeightedInterpolateC2F_SetGradient(
                 center_values,
                 centers,
             )
-            @test_opt opt_WeightedInterpolateC2F_Extrapolate(
+            @test_climaopt opt_WeightedInterpolateC2F_Extrapolate(
                 center_values,
                 centers,
             )
 
-            @test_opt opt_LeftBiasedC2F(centers)
-            @test_opt opt_RightBiasedC2F(centers)
+            @test_climaopt opt_LeftBiasedC2F(centers)
+            @test_climaopt opt_RightBiasedC2F(centers)
 
-            @test_opt opt_UpwindBiasedProductC2F_SetValue(
+            @test_climaopt opt_UpwindBiasedProductC2F_SetValue(
                 face_velocities,
                 centers,
             )
-            @test_opt opt_UpwindBiasedProductC2F_Extrapolate(
-                face_velocities,
-                centers,
-            )
-
-            @test_opt opt_AdvectionC2C_SetValue(face_velocities, centers)
-            @test_opt opt_AdvectionC2C_Extrapolate(face_velocities, centers)
-
-            @test_opt opt_FluxCorrectionC2C_Extrapolate(
+            @test_climaopt opt_UpwindBiasedProductC2F_Extrapolate(
                 face_velocities,
                 centers,
             )
 
-            @test_opt opt_GradientC2F_SetValue(centers)
-            @test_opt opt_GradientC2F_SetGradient(centers)
+            @test_climaopt opt_AdvectionC2C_SetValue(face_velocities, centers)
+            @test_climaopt opt_AdvectionC2C_Extrapolate(
+                face_velocities,
+                centers,
+            )
 
-            @test_opt opt_DivergenceC2F_SetValue(centers)
-            @test_opt opt_DivergenceC2F_SetDivergence(centers)
-            @test_opt opt_CurlC2F_SetValue(centers)
+            @test_climaopt opt_FluxCorrectionC2C_Extrapolate(
+                face_velocities,
+                centers,
+            )
+
+            @test_climaopt opt_GradientC2F_SetValue(centers)
+            @test_climaopt opt_GradientC2F_SetGradient(centers)
+
+            @test_climaopt opt_DivergenceC2F_SetValue(centers)
+            @test_climaopt opt_DivergenceC2F_SetDivergence(centers)
+            @test_climaopt opt_CurlC2F_SetValue(centers)
         end
     end
 

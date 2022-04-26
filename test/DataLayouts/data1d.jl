@@ -97,7 +97,7 @@ end
 end
 
 # Test that Julia ia able to optimize VF DataLayouts v1.7+
-@static if @isdefined(var"@test_opt")
+@static if @isdefined(var"@test_climaopt")
     @testset "VF analyzer optimizations" begin
         for FT in TestFloatTypes
             S1 = NamedTuple{(:a, :b), Tuple{Complex{FT}, FT}}
@@ -111,10 +111,10 @@ end
             f(a1, a2) = a1.a.re * a2.c + a1.b
 
             # property access
-            @test_opt getproperty(data1, :a)
+            @test_climaopt getproperty(data1, :a)
             # test map as proxy for broadcast
-            @test_opt map(f, data1, data2)
-            @test_opt mapreduce(f, +, data1, data2)
+            @test_climaopt map(f, data1, data2)
+            @test_climaopt mapreduce(f, +, data1, data2)
         end
     end
 end

@@ -7,7 +7,12 @@ function clima_function_filter(@nospecialize ft)
 end
 
 macro test_climaopt(ex0...)
-    return var"@test_opt"(__source__, __module__, :(function_filter=$clima_function_filter), ex0...)
+    return var"@test_opt"(
+        __source__,
+        __module__,
+        :(function_filter = $clima_function_filter),
+        ex0...,
+    )
 end
 
 # Order of tests is intended to reflect dependency order of functionality
