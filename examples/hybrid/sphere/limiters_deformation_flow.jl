@@ -62,7 +62,7 @@ ENV["GKSwstype"] = "nul"
 using ClimaCorePlots, Plots
 Plots.GRBackend()
 
-dirname = "deformation_flow"
+dirname = "limiters_deformation_flow"
 
 if lim_flag == false
     dirname = "$(dirname)_no_lim"
