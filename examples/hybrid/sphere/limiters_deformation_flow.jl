@@ -38,7 +38,7 @@ const λ_c1 = 150.0         # initial longitude of first tracer
 const λ_c2 = 210.0         # initial longitude of second tracer
 const ϕ_c = 0.0            # initial latitude of tracers
 const centers =
-    [Geometry.LatLongPoint(λ_c1, ϕ_c), Geometry.LatLongPoint(λ_c2, ϕ_c)] # center of bells
+    [Geometry.LatLongPoint(ϕ_c, λ_c1), Geometry.LatLongPoint(ϕ_c, λ_c2)]
 const z_c = 5.0e3          # initial altitude of tracers
 const R_t = R / 2          # horizontal half-width of tracers
 const Z_t = 1000.0         # vertical half-width of tracers
@@ -74,6 +74,7 @@ function linkfig(figpath, alt = "")
     end
 end
 
+# set up function space
 # set up function space
 function sphere_3D(
     R = 6.37122e6,
@@ -120,7 +121,7 @@ y0 = map(coords) do coord
     ϕ = coord.lat
     rd = Vector{Float64}(undef, 2)
 
-    # radial distances
+    # great circle distances
     for i in 1:2
         rd[i] = Geometry.great_circle_distance(coord, centers[i], global_geom)
     end
