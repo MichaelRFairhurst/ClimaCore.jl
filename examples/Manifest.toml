@@ -167,7 +167,7 @@ version = "0.3.3"
 
 [[deps.ClimaCoreVTK]]
 deps = ["ClimaCore", "WriteVTK"]
-path = "../lib/ClimaCoreVTK"
+git-tree-sha1 = "2a0f6f12ccdf50089e708b68e73b1fe08fb53cd8"
 uuid = "c8b6d40d-e815-466f-95ae-c48aefa668fa"
 version = "0.7.1"
 

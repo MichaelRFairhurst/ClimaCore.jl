@@ -50,8 +50,8 @@ const Z_t = 1000.0         # vertical half-width of tracers
 const D₄ = 1.0e16          # hyperviscosity coefficient
 const lim_flag = true      # limiters flag
 const limiter_tol = 5e-14  # limiters least-square optmimum tolerance
-T = 86400 * 12             # simulation times in seconds (12 days)
-dt = 60 * 60               # time step in seconds (60 minutes)
+T = 86400 * 12.0           # simulation times in seconds (12 days)
+dt = 30.0 * 60.0           # time step in seconds (60 minutes)
 zelems = 16
 helems = 8
 
