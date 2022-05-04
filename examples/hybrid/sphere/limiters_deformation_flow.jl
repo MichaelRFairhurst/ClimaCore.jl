@@ -11,9 +11,12 @@ import ClimaCore:
     Topologies,
     Spaces,
     Fields,
-    Operators
+    Operators,
+    Limiters
 import ClimaCore.Utilities: half
 
+using OrdinaryDiffEq: ODEProblem, solve
+using DiffEqBase
 using ClimaTimeSteppers
 
 import Logging
@@ -37,8 +40,10 @@ const b = 0.2              # normalized pressure depth of divergent layer
 const λ_c1 = 150.0         # initial longitude of first tracer
 const λ_c2 = 210.0         # initial longitude of second tracer
 const ϕ_c = 0.0            # initial latitude of tracers
-const centers =
-    [Geometry.LatLongPoint(ϕ_c, λ_c1), Geometry.LatLongPoint(ϕ_c, λ_c2)]
+const centers = [
+    Geometry.LatLongZPoint(ϕ_c, λ_c1, 0.0),
+    Geometry.LatLongZPoint(ϕ_c, λ_c2, 0.0),
+]
 const z_c = 5.0e3          # initial altitude of tracers
 const R_t = R / 2          # horizontal half-width of tracers
 const Z_t = 1000.0         # vertical half-width of tracers
@@ -47,6 +52,10 @@ const lim_flag = true      # limiters flag
 const limiter_tol = 5e-14  # limiters least-square optmimum tolerance
 T = 86400 * 12             # simulation times in seconds (12 days)
 dt = 60 * 60               # time step in seconds (60 minutes)
+zelems = 16
+helems = 8
+
+FT = Float64
 
 # visualization artifacts
 ENV["GKSwstype"] = "nul"
@@ -75,10 +84,9 @@ function linkfig(figpath, alt = "")
 end
 
 # set up function space
-# set up function space
 function sphere_3D(
     R = 6.37122e6,
-    zlim = (0, 12.0e3),
+    zlim = (0, 12.0e3);
     helem = 4,
     zelem = 12,
     npoly = 4,
@@ -105,16 +113,33 @@ function sphere_3D(
 end
 
 # set up 3D domain
-horzspace, hv_center_space, hv_face_space = sphere_3D()
+horzspace, hv_center_space, hv_face_space =
+    sphere_3D(helem = helems, zelem = zelems)
+global_geom = horzspace.global_geometry
+topology = horzspace.topology
 
-# initial conditions
-coords = Fields.coordinate_field(hv_center_space)
+# Extract coordinates
+center_coords = Fields.coordinate_field(hv_center_space)
 face_coords = Fields.coordinate_field(hv_face_space)
 
+# Initialize variables needed for limiters
+horz_n_elems = Topologies.nlocalelems(horzspace.topology)
+min_q1 = zeros(horz_n_elems, zelems)
+max_q1 = zeros(horz_n_elems, zelems)
+min_q2 = zeros(horz_n_elems, zelems)
+max_q2 = zeros(horz_n_elems, zelems)
+min_q3 = zeros(horz_n_elems, zelems)
+max_q3 = zeros(horz_n_elems, zelems)
+min_q4 = zeros(horz_n_elems, zelems)
+max_q4 = zeros(horz_n_elems, zelems)
+min_q5 = zeros(horz_n_elems, zelems)
+max_q5 = zeros(horz_n_elems, zelems)
+
+# Initialize pressure and density
 p(z) = p_0 * exp(-z / H)
 ρ_ref(z) = p(z) / R_d / T_0
 
-y0 = map(coords) do coord
+y0 = map(center_coords) do coord
     z = coord.z
     zd = z - z_c
     λ = coord.long
@@ -156,15 +181,44 @@ y0 = map(coords) do coord
     return (ρ = ρ_ref(z), ρq1 = ρq1, ρq2 = ρq2, ρq3 = ρq3, ρq4 = ρq4, ρq5 = ρq5)
 end
 
+y0 = Fields.FieldVector(
+    ρ = y0.ρ,
+    ρq1 = y0.ρq1,
+    ρq2 = y0.ρq2,
+    ρq3 = y0.ρq3,
+    ρq4 = y0.ρq4,
+    ρq5 = y0.ρq5,
+)
+
 function rhs!(dydt, y, parameters, t, alpha, beta)
 
+    # Set up operators
+    # Spectral horizontal operators
+    hwdiv = Operators.WeakDivergence()
+    hgrad = Operators.Gradient()
+    # Vertical staggered FD operators
+    If2c = Operators.InterpolateF2C()
+    Ic2f = Operators.InterpolateC2F(
+        bottom = Operators.Extrapolate(),
+        top = Operators.Extrapolate(),
+    )
+    vdivf2c = Operators.DivergenceF2C(
+        top = Operators.SetValue(Geometry.Contravariant3Vector(FT(0.0))),
+        bottom = Operators.SetValue(Geometry.Contravariant3Vector(FT(0.0))),
+    )
+    third_order_upwind_c2f = Operators.Upwind3rdOrderBiasedProductC2F(
+        bottom = Operators.ThirdOrderOneSided(),
+        top = Operators.ThirdOrderOneSided(),
+    )
+
+    # Define flow
     τ = parameters.τ
-    coords = parameters.center_coords
+    center_coords = parameters.center_coords
     face_coords = parameters.face_coords
 
-    ϕ = coords.lat
-    λ = coords.long
-    zc = coords.z
+    ϕ = center_coords.lat
+    λ = center_coords.long
+    zc = center_coords.z
     zf = face_coords.z
     λp = λ .- 360 * t / τ
     k = 10 * R / τ
@@ -209,24 +263,7 @@ function rhs!(dydt, y, parameters, t, alpha, beta)
     dρq4 = dydt.ρq4
     dρq5 = dydt.ρq5
 
-    # Set up operators
-    # Spectral horizontal operators
-    hwdiv = Operators.WeakDivergence()
-    hgrad = Operators.Gradient()
-    # Vertical staggered FD operators
-    If2c = Operators.InterpolateF2C()
-    Ic2f = Operators.InterpolateC2F(
-        bottom = Operators.Extrapolate(),
-        top = Operators.Extrapolate(),
-    )
-    vdivf2c = Operators.DivergenceF2C(
-        top = Operators.SetValue(Geometry.Contravariant3Vector(FT(0.0))),
-        bottom = Operators.SetValue(Geometry.Contravariant3Vector(FT(0.0))),
-    )
-    third_order_upwind_c2f = Operators.Upwind3rdOrderBiasedProductC2F(
-        bottom = Operators.ThirdOrderOneSided(),
-        top = Operators.ThirdOrderOneSided(),
-    )
+    # Define vertical fluxes
     vert_flux_wρ = vdivf2c.(w .* Ic2f.(ρ))
     vert_flux_wρq1 = vdivf2c.(Ic2f.(ρ) .* third_order_upwind_c2f.(w, ρq1 ./ ρ),)
     vert_flux_wρq2 = vdivf2c.(Ic2f.(ρ) .* third_order_upwind_c2f.(w, ρq2 ./ ρ),)
@@ -234,11 +271,7 @@ function rhs!(dydt, y, parameters, t, alpha, beta)
     vert_flux_wρq4 = vdivf2c.(Ic2f.(ρ) .* third_order_upwind_c2f.(w, ρq4 ./ ρ),)
     vert_flux_wρq5 = vdivf2c.(Ic2f.(ρ) .* third_order_upwind_c2f.(w, ρq5 ./ ρ),)
 
-    # Compute min_qi[] and max_qi[] that will be needed later in the stage limiter
-    horzspace = parameters.horzspace
-    horz_n_elems = Topologies.nlocalelems(horzspace)
-    topology = horzspace.topology
-
+    # Compute min_qi[] and max_qi[] that will be needed later in the stage limiters
     horz_neigh_elems_q1_min = Array{FT}(undef, 8, zelems)
     horz_neigh_elems_q1_max = Array{FT}(undef, 8, zelems)
 
@@ -339,7 +372,7 @@ function rhs!(dydt, y, parameters, t, alpha, beta)
                         Fields.slab(ρ, v, horz_neigh_elems[i]),
                     )
                     horz_neigh_elems_q3_max[i] = Fields.maximum(
-                        Fields.slab(ρq1, v, horz_neigh_elems[i]) ./
+                        Fields.slab(ρq3, v, horz_neigh_elems[i]) ./
                         Fields.slab(ρ, v, horz_neigh_elems[i]),
                     )
 
@@ -408,27 +441,35 @@ function rhs!(dydt, y, parameters, t, alpha, beta)
     Spaces.weighted_dss!(ystar.ρq4)
     @. ystar.ρq4 = -D₄ * hwdiv(ρ * hgrad(ystar.ρq4))
 
+    @. ystar.ρq5 = hwdiv(hgrad(ρq5 / ρ))
+    Spaces.weighted_dss!(ystar.ρq5)
+    @. ystar.ρq5 = -D₄ * hwdiv(ρ * hgrad(ystar.ρq5))
+
     # 1) Contintuity equation:
     @. dρ = beta * dρ - alpha * hwdiv(ρ * cuvw)
-    @. dρ -= alpha * vdivf2c.(first_order_Ic2f.(ρ .* uₕ))
+    @. dρ -= alpha * vdivf2c.(Ic2f.(ρ .* uₕ))
     @. dρ -= alpha * vert_flux_wρ
 
     # 2) Advection of tracers equations:
     @. dρq1 = beta * dρq1 - alpha * hwdiv(ρq1 * cuvw) + alpha * ystar.ρq1
-    @. dρq1 -= alpha * vdivf2c.(first_order_Ic2f.(ρq1 .* uₕ))
+    @. dρq1 -= alpha * vdivf2c.(Ic2f.(ρq1 .* uₕ))
     @. dρq1 -= alpha * vert_flux_wρq1
 
     @. dρq2 = beta * dρq2 - alpha * hwdiv(ρq2 * cuvw) + alpha * ystar.ρq2
-    @. dρq2 -= alpha * vdivf2c.(first_order_Ic2f.(ρq2 .* uₕ))
+    @. dρq2 -= alpha * vdivf2c.(Ic2f.(ρq2 .* uₕ))
     @. dρq2 -= alpha * vert_flux_wρq2
 
     @. dρq3 = beta * dρq3 - alpha * hwdiv(ρq3 * cuvw) + alpha * ystar.ρq3
-    @. dρq3 -= alpha * vdivf2c.(first_order_Ic2f.(ρq3 .* uₕ))
+    @. dρq3 -= alpha * vdivf2c.(Ic2f.(ρq3 .* uₕ))
     @. dρq3 -= alpha * vert_flux_wρq3
 
-    @. dρq4 = beta * dρq4 - alpha * hwdiv(ρq4 * cuvw) + alpha * ystar.ρq2
-    @. dρq4 -= alpha * vdivf2c.(first_order_Ic2f.(ρq4 .* uₕ))
+    @. dρq4 = beta * dρq4 - alpha * hwdiv(ρq4 * cuvw) + alpha * ystar.ρq4
+    @. dρq4 -= alpha * vdivf2c.(Ic2f.(ρq4 .* uₕ))
     @. dρq4 -= alpha * vert_flux_wρq4
+
+    @. dρq5 = beta * dρq5 - alpha * hwdiv(ρq5 * cuvw) + alpha * ystar.ρq5
+    @. dρq5 -= alpha * vdivf2c.(Ic2f.(ρq5 .* uₕ))
+    @. dρq5 -= alpha * vert_flux_wρq5
 
     # Apply the limiters:
     # First read in the min_q/max_q at the current time step
@@ -450,74 +491,78 @@ function rhs!(dydt, y, parameters, t, alpha, beta)
     if lim_flag
         # Call quasimonotone limiter, to find optimal ρq_i (where ρq_i gets updated in place)
         Limiters.quasimonotone_limiter!(
-            dy.ρq1,
-            dy.ρ,
+            ρq1,
+            ρ,
             min_q1,
             max_q1,
             rtol = limiter_tol,
         )
 
         Limiters.quasimonotone_limiter!(
-            dy.ρq2,
-            dy.ρ,
+            ρq2,
+            ρ,
             min_q2,
             max_q2,
             rtol = limiter_tol,
         )
 
         Limiters.quasimonotone_limiter!(
-            dy.ρq3,
-            dy.ρ,
+            ρq3,
+            ρ,
             min_q3,
             max_q3,
             rtol = limiter_tol,
         )
 
         Limiters.quasimonotone_limiter!(
-            dy.ρq4,
-            dy.ρ,
+            ρq4,
+            ρ,
             min_q4,
             max_q4,
             rtol = limiter_tol,
         )
 
         Limiters.quasimonotone_limiter!(
-            dy.ρq5,
-            dy.ρ,
+            ρq5,
+            ρ,
             min_q5,
             max_q5,
             rtol = limiter_tol,
         )
     end
-    Spaces.weighted_dss!(dy.ρ)
-    Spaces.weighted_dss!(dy.ρq1)
-    Spaces.weighted_dss!(dy.ρq2)
-    Spaces.weighted_dss!(dy.ρq3)
-    Spaces.weighted_dss!(dy.ρq4)
-    Spaces.weighted_dss!(dy.ρq5)
+    Spaces.weighted_dss!(dydt.ρ)
+    Spaces.weighted_dss!(dydt.ρq1)
+    Spaces.weighted_dss!(dydt.ρq2)
+    Spaces.weighted_dss!(dydt.ρq3)
+    Spaces.weighted_dss!(dydt.ρq4)
+    Spaces.weighted_dss!(dydt.ρq5)
 end
 
-dydt = similar(y0)
+# Set up vectors and parameters needed for the RHS function
+ystar = copy(y0)
 
 parameters = (
     horzspace = horzspace,
-    min_Q = min_Q,
-    max_Q = max_Q,
+    min_q1 = min_q1,
+    max_q1 = max_q1,
+    min_q2 = min_q2,
+    max_q2 = max_q2,
+    min_q3 = min_q3,
+    max_q3 = max_q3,
+    min_q4 = min_q4,
+    max_q4 = max_q4,
+    min_q5 = min_q5,
+    max_q5 = max_q5,
     τ = τ,
     center_coords = center_coords,
     face_coords = face_coords,
 )
 
 # Set up the RHS function
-rhs!(dydt, y0, parameters, 0.0, dt, 1)
+rhs!(ystar, y0, parameters, 0.0, dt, 1)
 
 # Solve the ODE
-prob = ODEProblem(
-    IncrementingODEFunction(f!),
-    copy(y0),
-    (0.0, end_time),
-    parameters,
-)
+prob = ODEProblem(IncrementingODEFunction(rhs!), copy(y0), (0.0, T), parameters)
 sol = solve(
     prob,
     SSPRK33ShuOsher(),
@@ -525,32 +570,40 @@ sol = solve(
     saveat = 0.99 * dt,
     progress = true,
     adaptive = false,
-    progress_message = (dt, u, p, t) -> t,
+    progress_message = (dt, u, pm, t) -> t,
 )
 
 q1_error =
-    norm(sol.u[end].ρq1 ./ ρ_ref.(coords.z) .- y0.ρq1 ./ ρ_ref.(coords.z)) /
-    norm(y0.ρq1 ./ ρ_ref.(coords.z))
+    norm(
+        sol.u[end].ρq1 ./ ρ_ref.(center_coords.z) .-
+        y0.ρq1 ./ ρ_ref.(center_coords.z),
+    ) / norm(y0.ρq1 ./ ρ_ref.(center_coords.z))
 @test q1_error ≈ 0.0 atol = 0.7
 
 q2_error =
-    norm(sol.u[end].ρq2 ./ ρ_ref.(coords.z) .- y0.ρq2 ./ ρ_ref.(coords.z)) /
-    norm(y0.ρq2 ./ ρ_ref.(coords.z))
+    norm(
+        sol.u[end].ρq2 ./ ρ_ref.(center_coords.z) .-
+        y0.ρq2 ./ ρ_ref.(center_coords.z),
+    ) / norm(y0.ρq2 ./ ρ_ref.(center_coords.z))
 @test q2_error ≈ 0.0 atol = 0.03
 
 q3_error =
-    norm(sol.u[end].ρq3 ./ ρ_ref.(coords.z) .- y0.ρq3 ./ ρ_ref.(coords.z)) /
-    norm(y0.ρq3 ./ ρ_ref.(coords.z))
+    norm(
+        sol.u[end].ρq3 ./ ρ_ref.(center_coords.z) .-
+        y0.ρq3 ./ ρ_ref.(center_coords.z),
+    ) / norm(y0.ρq3 ./ ρ_ref.(center_coords.z))
 @test q3_error ≈ 0.0 atol = 0.4
 
 q4_error =
-    norm(sol.u[end].ρq4 ./ ρ_ref.(coords.z) .- y0.ρq4 ./ ρ_ref.(coords.z)) /
-    norm(y0.ρq4 ./ ρ_ref.(coords.z))
+    norm(
+        sol.u[end].ρq4 ./ ρ_ref.(center_coords.z) .-
+        y0.ρq4 ./ ρ_ref.(center_coords.z),
+    ) / norm(y0.ρq4 ./ ρ_ref.(center_coords.z))
 @test q4_error ≈ 0.0 atol = 0.03
 
 Plots.png(
     Plots.plot(
-        sol.u[trunc(Int, end / 2)].ρq3 ./ ρ_ref.(coords.z),
+        sol.u[trunc(Int, end / 2)].ρq3 ./ ρ_ref.(center_coords.z),
         level = 5,
         clim = (-1, 1),
     ),
@@ -558,6 +611,10 @@ Plots.png(
 )
 
 Plots.png(
-    Plots.plot(sol.u[end].ρq3 ./ ρ_ref.(coords.z), level = 5, clim = (-1, 1)),
+    Plots.plot(
+        sol.u[end].ρq3 ./ ρ_ref.(center_coords.z),
+        level = 5,
+        clim = (-1, 1),
+    ),
     joinpath(path, "q3_12day.png"),
 )
