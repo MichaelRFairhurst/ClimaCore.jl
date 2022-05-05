@@ -51,8 +51,8 @@ const D₄ = 1.0e16          # hyperviscosity coefficient
 const lim_flag = true      # limiters flag
 const limiter_tol = 5e-14  # limiters least-square optmimum tolerance
 T = 86400 * 12.0           # simulation times in seconds (12 days)
-dt = 30.0 * 60.0           # time step in seconds (60 minutes)
-zelems = 16
+dt = 20.0 * 60.0           # time step in seconds (20 minutes)
+zelems = 24
 helems = 8
 
 FT = Float64
@@ -445,10 +445,11 @@ function rhs!(dydt, y, parameters, t, alpha, beta)
     Spaces.weighted_dss!(ystar.ρq5)
     @. ystar.ρq5 = -D₄ * hwdiv(ρ * hgrad(ystar.ρq5))
 
-    # 1) Contintuity equation:
+    # 1) Continuity equation:
     @. dρ = beta * dρ - alpha * hwdiv(ρ * cuvw)
     @. dρ -= alpha * vdivf2c.(Ic2f.(ρ .* uₕ))
     @. dρ -= alpha * vert_flux_wρ
+    # dρ .= 0 .* ρ # In case this is not discretely satisfied
 
     # 2) Advection of tracers equations:
     @. dρq1 = beta * dρq1 - alpha * hwdiv(ρq1 * cuvw) + alpha * ystar.ρq1
