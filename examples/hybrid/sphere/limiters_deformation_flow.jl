@@ -51,7 +51,7 @@ const D₄ = 1.0e16          # hyperviscosity coefficient
 const lim_flag = false      # limiters flag
 const limiter_tol = 5e-14  # limiters least-square optmimum tolerance
 T = 86400 * 12.0           # simulation times in seconds (12 days)
-dt = 60.0 * 60.0           # time step in seconds (20 minutes)
+dt = 30.0 * 60.0           # time step in seconds (20 minutes)
 zelems = 36
 helems = 8
 
@@ -245,7 +245,7 @@ function rhs!(dydt, y, parameters, t, alpha, beta)
     uₕ = Geometry.Covariant12Vector.(Geometry.UVVector.(uu, uv))
     w = Geometry.Covariant3Vector.(Geometry.WVector.(uw))
 
-    # Compute vertical velocity by interpolating faces to centers
+    # Compute velocity by interpolating faces to centers
     cw = If2c.(w)
     cuvw = Geometry.Covariant123Vector.(uₕ) .+ Geometry.Covariant123Vector.(cw)
 
@@ -446,30 +446,30 @@ function rhs!(dydt, y, parameters, t, alpha, beta)
     @. ystar.ρq5 = -D₄ * hwdiv(ρ * hgrad(ystar.ρq5))
 
     # 1) Continuity equation:
-    @. dρ = beta * dρ - alpha * hwdiv(ρ * cuvw)
-    @. dρ -= alpha * vdivf2c.(Ic2f.(ρ .* uₕ))
-    @. dρ -= alpha * vert_flux_wρ
-    # dρ .= 0 .* ρ # In case this is not discretely satisfied
+    @. dydt.ρ = beta * dρ - alpha * hwdiv(ρ * cuvw)
+    @. dydt.ρ -= alpha * vdivf2c.(Ic2f.(ρ .* uₕ))
+    @. dydt.ρ -= alpha * vert_flux_wρ
+    # dydt.ρ = beta * dydt.ρ + 0 .* y.ρ # In case this is not discretely satisfied
 
     # 2) Advection of tracers equations:
     @. dρq1 = beta * dρq1 - alpha * hwdiv(ρq1 * cuvw) + alpha * ystar.ρq1
-    @. dρq1 -= alpha * vdivf2c.(Ic2f.(ρq1 .* uₕ))
+    @. dρq1 -= alpha * vdivf2c(Ic2f(ρq1 * uₕ))
     @. dρq1 -= alpha * vert_flux_wρq1
 
     @. dρq2 = beta * dρq2 - alpha * hwdiv(ρq2 * cuvw) + alpha * ystar.ρq2
-    @. dρq2 -= alpha * vdivf2c.(Ic2f.(ρq2 .* uₕ))
+    @. dρq2 -= alpha * vdivf2c(Ic2f(ρq2 * uₕ))
     @. dρq2 -= alpha * vert_flux_wρq2
 
     @. dρq3 = beta * dρq3 - alpha * hwdiv(ρq3 * cuvw) + alpha * ystar.ρq3
-    @. dρq3 -= alpha * vdivf2c.(Ic2f.(ρq3 .* uₕ))
+    @. dρq3 -= alpha * vdivf2c(Ic2f(ρq3 * uₕ))
     @. dρq3 -= alpha * vert_flux_wρq3
 
     @. dρq4 = beta * dρq4 - alpha * hwdiv(ρq4 * cuvw) + alpha * ystar.ρq4
-    @. dρq4 -= alpha * vdivf2c.(Ic2f.(ρq4 .* uₕ))
+    @. dρq4 -= alpha * vdivf2c(Ic2f(ρq4 * uₕ))
     @. dρq4 -= alpha * vert_flux_wρq4
 
     @. dρq5 = beta * dρq5 - alpha * hwdiv(ρq5 * cuvw) + alpha * ystar.ρq5
-    @. dρq5 -= alpha * vdivf2c.(Ic2f.(ρq5 .* uₕ))
+    @. dρq5 -= alpha * vdivf2c(Ic2f(ρq5 * uₕ))
     @. dρq5 -= alpha * vert_flux_wρq5
 
     # Apply the limiters:
@@ -568,7 +568,7 @@ sol = solve(
     prob,
     SSPRK33ShuOsher(),
     dt = dt,
-    saveat = 0.99 * dt,
+    saveat = 0.99 * 20 * dt,
     progress = true,
     adaptive = false,
     progress_message = (dt, u, pm, t) -> t,
@@ -605,7 +605,7 @@ q4_error =
 Plots.png(
     Plots.plot(
         sol.u[trunc(Int, end / 2)].ρq3 ./ ρ_ref.(center_coords.z),
-        level = 5,
+        level = 15,
         clim = (-1, 1),
     ),
     joinpath(path, "q3_6day.png"),
@@ -614,7 +614,7 @@ Plots.png(
 Plots.png(
     Plots.plot(
         sol.u[end].ρq3 ./ ρ_ref.(center_coords.z),
-        level = 5,
+        level = 15,
         clim = (-1, 1),
     ),
     joinpath(path, "q3_12day.png"),
